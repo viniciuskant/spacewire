@@ -1,30 +1,31 @@
 module state_machine #(
-    parameter DEPTH_FIFO = 2048
+    parameter CLK_FREQ = 10_000_000
 )(
     input logic clk,
     input logic rst_n,
 
-    // RX/TX
+    // RX
     output logic en_rx,
     output logic rst_rx,
-    output logic en_tx,
-    output logic rst_tx,
-    
-    output logic send_FCT,
-    output logic send_Null,
-    output logic send_NChar,
-
-    // FSM
-    input logic start_link,
     input logic got_bit,
-    input logic link_disabled,
     input logic got_FCT,
     input logic got_null,
     input logic got_TimeCode,
     input logic got_N_Char,
     input logic got_Cred,
     input logic rx_Error,
-    input logic [$clog2(DEPTH_FIFO)-1:0] free_slots_fifo
+
+    // TX
+    output logic en_tx,
+    output logic rst_tx,
+    output logic send_FCT,
+    output logic send_Null,
+    output logic send_NChar,
+
+    // FSM
+    input logic link_disabled,
+    input logic start_link,
+    output logic run_state
 );
 
     // TODO: por hora vou deixar assim
@@ -48,11 +49,14 @@ module state_machine #(
         end
     end
 
-    // Flags de Timeout
+    localparam int unsigned T_6_4US_CYCLES  = (CLK_FREQ * 64) / 10_000_000;
+    localparam int unsigned T_12_8US_CYCLES = (CLK_FREQ * 128) / 10_000_000;
+
     logic timeout_6_4us;
     logic timeout_12_8us;
-    assign timeout_6_4us = (timer_us_cnt >= 8'd64);
-    assign timeout_12_8us = (timer_us_cnt >= 8'd128);
+    assign timeout_6_4us  = (timer_us_cnt >= T_6_4US_CYCLES);
+    assign timeout_12_8us = (timer_us_cnt >= T_12_8US_CYCLES);
+
 
     typedef enum logic [2:0] {
         ERRO_RESET = 3'b000,
@@ -65,7 +69,6 @@ module state_machine #(
 
     state_t current_state, next_state;
 
-    // Atualização de Estado Corrente
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             current_state <= ERRO_RESET;
@@ -90,21 +93,21 @@ module state_machine #(
 
             ERRO_WAIT: begin
                 timer_en = 1'b1;
-                if (timeout_12_8us) begin
-                    next_state = READY;
-                    timer_clear = 1'b1;
-                end else if (rx_Error | got_FCT | got_N_Char | got_TimeCode) begin
+                if (rx_Error | got_FCT | got_N_Char | got_TimeCode) begin
                     next_state = ERRO_RESET;
                     timer_clear = 1'b1;
-                end
+                end else if (timeout_12_8us) begin
+                    next_state = READY;
+                    timer_clear = 1'b1;
+                end 
             end
 
             READY: begin
-                if (start_link || (auto_start && got_bit)) begin
-                    next_state = STARTED;
-                    timer_clear = 1'b1;
-                end else if (rx_Error | got_FCT | got_N_Char | got_TimeCode) begin
+                if (rx_Error | got_FCT | got_N_Char | got_TimeCode) begin
                     next_state = ERRO_RESET;
+                    timer_clear = 1'b1;
+                end else if (!link_disabled && (start_link || (auto_start && got_bit))) begin
+                    next_state = STARTED;
                     timer_clear = 1'b1;
                 end
             end
@@ -132,6 +135,8 @@ module state_machine #(
             end
 
             RUN: begin
+                //no 4link, usa diferente, usa isso:
+                // if ((! (!link_disabled && (start_link || (auto_start and got_bit))) )|| rx_Error) begin
                 if (link_disabled || rx_Error) begin
                     next_state = ERRO_RESET;
                     timer_clear = 1'b1;
@@ -153,6 +158,7 @@ module state_machine #(
         send_FCT = 1'b0;
         send_Null = 1'b0;
         send_NChar = 1'b0;
+        run_state = 1'b0;
 
         case (current_state)
             ERRO_RESET: begin
@@ -176,19 +182,20 @@ module state_machine #(
                 en_rx = 1'b1;
             end
 
-            CONNECTING: begin //TODO: Arrumar a lógica de envios, verificar como deve ser
+            CONNECTING: begin
                 en_tx = 1'b1;
                 send_FCT = 1'b1;
                 send_Null = 1'b1;
                 en_rx = 1'b1;
             end
 
-            RUN: begin //TODO: Arrumar a lógica de envio de FCT baseado em free_slots_fifo
+            RUN: begin
                 en_tx = 1'b1;
                 send_FCT = 1'b1;
                 send_NChar = 1'b1;
                 send_Null = 1'b1;
                 en_rx = 1'b1;
+                run_state = 1'b1;
             end
         endcase
     end
