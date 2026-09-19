@@ -1,0 +1,20 @@
+# Build artifacts
+build/
+obj_dir/
+
+# Waveforms
+waves/
+*.vcd
+*.fst
+*.ghw
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Nix
+result
+result-*
+.direnv/
