@@ -1,12 +1,12 @@
 module flow_control_rx #(
     parameter DEPTH_FIFO = 2048
 )(
-    input  logic clk,
-    input  logic rst_n,
+    input logic clk,
+    input logic rst_n,
 
-    input  logic run_state,
-    input  logic en_in_fifo_rx, // 1 quando um N-Char é gravado
-    input  logic [$clog2(DEPTH_FIFO)-1:0] free_slots_fifo,
+    input logic run_state,
+    input logic en_in_fifo_rx, // 1 quando um N-Char é gravado
+    input logic [$clog2(DEPTH_FIFO)-1:0] free_slots_fifo,
 
     output logic send_FCT
 );

@@ -3,30 +3,34 @@ module flow_control_tx (
     input logic rst_n,
 
     input logic run_state,
-    input logic en_out_fifo_tx, // se alta mandou um dado
+    input logic en_out_fifo_tx, // se alto mandou um dado
     input logic got_FCT_rx,
 
     output logic sending_allowed
 );
 
-    logic [6:0] credits; //no máximo 7 FCT pendentes, 56 pacotes, 8 bits
+    localparam int MAX_CREDITS = 56;
+    localparam int FCT_GRANT   = 8;
 
-    always_ff @(posedge clk) begin 
+    logic [6:0] credits; //no máximo 7 FCT pendentes, 56 pacotes, 7 bits
+
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             credits <= '0;
-        end else if (run_state) begin
-            if (en_out_fifo_tx and got_FCT_rx) credits <= credits;
-            if (en_out_fifo_tx) credits <= credits - 1;
-            if (got_FCT_rx credits <= 48) credits <= credits + 8;
+        end else if (!run_state) begin
+            credits <= '0;
+        end else begin
+            unique case ({got_FCT_rx && (credits <= MAX_CREDITS - FCT_GRANT),
+                          en_out_fifo_tx})
+                2'b10: credits <= credits + FCT_GRANT;
+                2'b01: credits <= credits - 1;
+                2'b11: credits <= credits + FCT_GRANT - 1;
+                default: credits <= credits;
+            endcase
         end
     end
 
     // TODO analisar isso futuramente, pois devido a ciclos de clk isso pode gerar atrasos
-    logic sending_allowed_reg;
-    always_ff @(posedge clk) begin
-        if (!rst_n) sending_allowed_reg <= 1'b0;
-        else sending_allowed_reg <= |credits;
-    end
-    assign sending_allowed = sending_allowed_reg;
+    assign sending_allowed = (credits != 0);
 
 endmodule
