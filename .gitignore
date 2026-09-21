@@ -1,0 +1,14 @@
+# Local-only folders (not part of the shared repo)
+Guides/
+sim/
+
+# Simulation/build artifacts
+*.vvp
+*.vcd
+*.fst
+*.wlf
+*.log
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
