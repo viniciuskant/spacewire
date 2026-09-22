@@ -1,0 +1,21 @@
+{
+  "flags": "-I/home/ggsvr/.local/lib/uvm/src -DUVM_NO_DPI -I./sim",
+  "index": [
+    {
+      "dirs": ["rtl", "sim", "/home/ggsvr/.local/lib/uvm/src"],
+      "excludeDirs": ["build", "synth"]
+    }
+  ],
+  "buildPattern": "builds/**/*.f",
+  "builds": [
+    {
+      "glob": "build/generated/**/*.f"
+    },
+    {
+      "name": "synth",
+      "glob": "**/Makefile",
+      "command": "scripts/makedotf.py"
+    }
+  ],
+  "indexingThreads": 4
+}
