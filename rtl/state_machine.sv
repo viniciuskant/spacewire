@@ -1,12 +1,12 @@
 module state_machine #(
-    parameter CLK_FREQ = 10_000_000
+    parameter int CLK_FREQ = 10_000_000
 )(
     input logic clk,
     input logic rst_n,
 
     // RX
     output logic en_rx,
-    output logic rst_rx,
+    output logic rst_n_rx,
     input logic got_bit,
     input logic got_FCT,
     input logic got_null,
@@ -17,7 +17,7 @@ module state_machine #(
 
     // TX
     output logic en_tx,
-    output logic rst_tx,
+    output logic rst_n_tx,
     output logic send_FCT,
     output logic send_Null,
     output logic send_NChar,
@@ -152,9 +152,9 @@ module state_machine #(
     // saídas
     always_comb begin
         en_rx = 1'b0;
-        rst_rx = 1'b0;
+        rst_n_rx = 1'b1;
         en_tx = 1'b0;
-        rst_tx = 1'b0;
+        rst_n_tx = 1'b1;
         send_FCT = 1'b0;
         send_Null = 1'b0;
         send_NChar = 1'b0;
@@ -162,17 +162,17 @@ module state_machine #(
 
         case (current_state)
             ERRO_RESET: begin
-                rst_tx = 1'b1;
-                rst_rx = 1'b1;
+                rst_n_tx = 1'b0;
+                rst_n_rx = 1'b0;
             end
 
             ERRO_WAIT: begin
-                rst_tx = 1'b1;
+                rst_n_tx = 1'b0;
                 en_rx = 1'b1;
             end
 
             READY: begin
-                rst_tx = 1'b1;
+                rst_n_tx = 1'b0;
                 en_rx = 1'b1;
             end
 
