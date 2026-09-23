@@ -8,14 +8,23 @@ waves/
 *.vcd
 *.fst
 *.ghw
+*.vvp
+*.wlf
+*.log
 
 # Editor / OS
 .vscode/
 .idea/
 *.swp
 .DS_Store
+Thumbs.db
 
 # Nix
 result
 result-*
 .direnv/
+
+# Local-only folders (not part of the shared repo)
+Guides/
+sim/
+
