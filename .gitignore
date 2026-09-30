@@ -26,5 +26,7 @@ result-*
 
 # Local-only folders (not part of the shared repo)
 Guides/
-sim/
 
+
+sim/claude
+sim/gemini

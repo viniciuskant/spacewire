@@ -3,7 +3,7 @@
   "index": [
     {
       "dirs": ["rtl", "sim", "/home/ggsvr/.local/lib/uvm/src"],
-      "excludeDirs": ["build", "synth"]
+      "excludeDirs": ["build", "synth", "sim/old", "sim/claude", "sim/gemini"]
     }
   ],
   "buildPattern": "builds/**/*.f",

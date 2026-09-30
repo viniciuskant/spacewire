@@ -1,0 +1,10 @@
+sim/link/spw_defines.svh
+sim/link/spw_host_driver.sv
+sim/link/spw_host_if.sv
+sim/link/spw_host_monitor.sv
+sim/link/spw_host_sequencer.sv
+sim/link/spw_serial_driver.sv
+sim/link/spw_serial_if.sv
+sim/link/spw_serial_item.sv
+sim/link/spw_serial_monitor.sv
+sim/link/spw_serial_sequencer.sv
