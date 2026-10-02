@@ -1,4 +1,3 @@
-
 interface spw_serial_if;
 
   logic din;
@@ -6,5 +5,7 @@ interface spw_serial_if;
 
   logic dout;
   logic sout;
+
+  logic fast_clk;
 
 endinterface

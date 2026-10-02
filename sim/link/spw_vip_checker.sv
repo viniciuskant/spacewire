@@ -17,11 +17,12 @@ package selftest_checker_pkg;
     endfunction
 
     task run_phase(uvm_phase phase);
-      spw_serial_char_item exp_item, act_item;
+      spw_serial_char_item exp_item, next_exp_item, act_item;
 
+      driver_fifo.get(exp_item);
       forever begin
-        driver_fifo.get(exp_item);
         mon_rx_fifo.get(act_item);
+        driver_fifo.get(next_exp_item);
 
         // Verify Character Type and Data Match
         if (exp_item.typ != act_item.typ || exp_item.data != act_item.data) begin
@@ -31,13 +32,14 @@ package selftest_checker_pkg;
           )
         end
 
-        // Verify Parity Error Injection matches Observation
-        if (exp_item.inject_parity_err != act_item.parity_err_detected) begin
+        // Verify Parity Error (current actual vs NEXT expected)
+        if (next_exp_item.inject_parity_err != act_item.parity_err_detected) begin
           `uvm_error(
             "INTF_CHK",
             $sformatf("PARITY MISMATCH! Injected: %0b, Observed: %0b", exp_item.inject_parity_err, act_item.parity_err_detected)
           )
         end
+        exp_item = next_exp_item;
       end
     endtask
   endclass

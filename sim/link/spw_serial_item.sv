@@ -9,8 +9,6 @@ package serial_item_pkg;
       super.new(name);
     endfunction
 
-    virtual function string convert2str();
-    endfunction
   endclass
 
   class spw_serial_config_item extends spw_serial_base_item;
@@ -25,7 +23,7 @@ package serial_item_pkg;
       super.new(name);
     endfunction
 
-    virtual function string convert2str();
+    virtual function string convert2string();
       string s;
       s = $sformatf("SPW_CFG type=%s", typ.name());
       return s;
@@ -54,6 +52,9 @@ package serial_item_pkg;
 
     constraint ctl_no_data {
       (typ != SPW_CHAR_DATA && typ != SPW_CHAR_TIMECODE) -> (data == 0);
+    }
+    constraint no_pure_esc {
+      typ != SPW_CHAR_ESC;
     }
 
     virtual function string convert2string();

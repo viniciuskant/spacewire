@@ -20,6 +20,7 @@ package selftest_seq_pkg;
     virtual task body();
       int parity_err = 0;
       spw_serial_config_item rst_item = spw_serial_config_item::type_id::create("rst_item");
+      spw_serial_char_item flush_item;
 
       start_item(rst_item);
       `uvm_info("SEQ", "Generating reset config item", UVM_HIGH)
@@ -41,50 +42,18 @@ package selftest_seq_pkg;
         if (parity_err == 0)
           item.inject_parity_err = 1;
 
-        `uvm_info("SEQ", $sformatf("Generate new item: %s", item.convert2str()), UVM_HIGH)
+        `uvm_info("SEQ", $sformatf("Generate new item: %s", item.convert2string()), UVM_HIGH)
         finish_item(item);
       end
+      flush_item = spw_serial_char_item::type_id::create("flush_item");
+      start_item(flush_item);
+      flush_item.typ = SPW_CHAR_NULL;
+      flush_item.data = 0;
+      `uvm_info("SEQ", "Sending NULL to flush monitor", UVM_HIGH)
+      finish_item(flush_item);
+
       `uvm_info("SEQ", $sformatf("Done generation of %0d items", num), UVM_LOW)
     endtask
-    virtual task send_item(spw_serial_base_item item);
-      start_item(item);
-      `uvm_info("SEQ", $sformatf("Generate new item: %s", item.convert2str()), UVM_HIGH)
-      finish_item(item);
-    endtask
-    virtual function spw_serial_config_item item_reset();
-      spw_serial_config_item item = spw_serial_config_item::type_id::create("item");
-      item.typ = SPW_CFG_RESET;
-      return item;
-    endfunction
-    virtual function spw_serial_config_item item_set_speed(real mhz);
-      spw_serial_config_item item = spw_serial_config_item::type_id::create("item");
-      item.typ = SPW_CFG_SPEED;
-      item.new_baud_rate_mhz = mhz;
-      return item;
-    endfunction
-    virtual function spw_serial_char_item item_data(byte d);
-      spw_serial_char_item item = spw_serial_char_item::type_id::create("item");
-      item.typ = SPW_CHAR_DATA;
-      item.data = d;
-      return item;
-    endfunction
-    virtual function spw_serial_char_item item_timecode(byte d);
-      spw_serial_char_item item = spw_serial_char_item::type_id::create("item");
-      item.typ = SPW_CHAR_TIMECODE;
-      item.data = d;
-      return item;
-    endfunction
-    virtual function spw_serial_char_item item_fct();
-      spw_serial_char_item item = spw_serial_char_item::type_id::create("item");
-      item.typ = SPW_CHAR_FCT;
-      item.data = 0;
-      return item;
-    endfunction
-    virtual function spw_serial_char_item item_null();
-      spw_serial_char_item item = spw_serial_char_item::type_id::create("item");
-      item.typ = SPW_CHAR_NULL;
-      item.data = 0;
-      return item;
-    endfunction
+
   endclass
 endpackage

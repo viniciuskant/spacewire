@@ -9,8 +9,6 @@ package serial_monitor_pkg;
     `uvm_component_utils(spw_serial_monitor)
 
     virtual spw_serial_if vif;
-    // high-speed oversampling clock (2GHz)
-    bit fast_clk;
 
     // clean, stable signals
     logic filtered_sin, filtered_din;
@@ -26,15 +24,6 @@ package serial_monitor_pkg;
       super.new(name, parent);
     endfunction
 
-    virtual task generate_fast_clk();
-      fast_clk = 0;
-      forever begin
-        #250ps;
-        fast_clk = ~fast_clk;
-      end
-
-    endtask
-
     virtual function void build_phase(uvm_phase phase);
       super.build_phase(phase);
 
@@ -48,7 +37,6 @@ package serial_monitor_pkg;
 
     virtual task run_phase(uvm_phase phase);
       fork
-        generate_fast_clk();
         recover_clock();
         monitor_tx_path();
         monitor_rx_path();
@@ -71,7 +59,7 @@ package serial_monitor_pkg;
       logic next_dout, next_sout;
 
       forever begin
-        @(posedge fast_clk);
+        @(posedge vif.fast_clk);
         din_shift = {din_shift[1:0], vif.din};
         sin_shift = {sin_shift[1:0], vif.sin};
         dout_shift = {dout_shift[1:0], vif.dout};
@@ -114,6 +102,7 @@ package serial_monitor_pkg;
       bit curr_char_flag;
       bit curr_parity_bit;
       bit parity_result = 0;
+      bit cached_esc_parity_err = 0;
       bit first = 1;
       bit seen_esc = 0;
       bit is_null = 0;
@@ -133,7 +122,7 @@ package serial_monitor_pkg;
         if (first)
           first = 0;
         else begin
-          item = spw_serial_char_item::type_id::create("item", this);
+          item = spw_serial_char_item::type_id::create("item");
           item.typ = prev_typ;
           item.data = 0;
           item.inject_parity_err = 0;
@@ -176,9 +165,18 @@ package serial_monitor_pkg;
           if (is_null) begin
             item.typ = SPW_CHAR_NULL;
           end
+          else if (is_timecode) begin
+            item.typ = SPW_CHAR_TIMECODE;
+          end
 
-          // if it's a ESC character, we're not sending
-          if (!seen_esc) begin
+          // since we're not sending the ESC, we cache the parity error and
+          // bundle it with the next character.
+          if (seen_esc) begin
+            cached_esc_parity_err = item.parity_err_detected;
+          end
+          else begin
+            item.parity_err_detected |= cached_esc_parity_err;
+            cached_esc_parity_err = 0;
             if (tx_path)
               tx_analysis_port.write(item);
             else

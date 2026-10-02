@@ -31,6 +31,8 @@ package serial_driver_pkg;
       encoder = new();
       last_d = 0;
       last_s = 0;
+      vif.din <= 0;
+      vif.sin <= 0;
     endfunction
 
     virtual function void build_phase(uvm_phase phase);

@@ -33,6 +33,8 @@ package selftest_test_pkg;
     virtual task run_phase(uvm_phase phase);
       phase.raise_objection(this);
       seq.start(env0.a0.s0);
+      // allow bits to traverse driver and checker
+      phase.phase_done.set_drain_time(this, 50us);
       phase.drop_objection(this);
     endtask
 
