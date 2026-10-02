@@ -35,6 +35,9 @@ module codec #(
     logic wr_en_fifo_tx;
     logic empty_tx_fifo;
 
+    logic [$clog2(DEPTH_FIFO)-1:0] free_slots_fifo_rx;
+
+
     rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) dut_rx_fifo (
         .wr_clk_i(clk), //TODO por hora estão iguais, mas tem que ser mudados
         .rd_clk_i(clk), //TODO por hora estão iguais, mas tem que ser mudados
@@ -69,8 +72,6 @@ module codec #(
     logic sending_allowed;
     logic send_fct, send_fct_fc, send_fct_sm;
     assign send_fct = send_fct_fc | send_fct_sm;
-
-    logic [$clog2(DEPTH_FIFO)-1:0] free_slots_fifo_rx;
 
     flow_control #(.DEPTH_FIFO(DEPTH_FIFO)) dut_fc(
         .clk(clk),

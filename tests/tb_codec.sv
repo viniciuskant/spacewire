@@ -13,9 +13,10 @@ module tb_codec #(
     // CODEC A 
     logic [8:0] SpW_Packet_TX_A;
     logic [8:0] SpW_Packet_RX_A;
-    logic SpW_Packet_TX_valid_A;
-    logic SpW_Packet_RX_valid_A;
+    logic SpW_Packet_TX_en_A;
+    logic SpW_Packet_RX_en_A;
     logic empty_rx_fifo_A;
+    logic full_tx_fifo_A;
 
     logic [7:0] Time_Code_TX_A;
     logic [7:0] Time_Code_RX_A;
@@ -26,9 +27,10 @@ module tb_codec #(
     // CODEC B
     logic [8:0] SpW_Packet_TX_B;
     logic [8:0] SpW_Packet_RX_B;
-    logic SpW_Packet_TX_valid_B;
-    logic SpW_Packet_RX_valid_B;
+    logic SpW_Packet_TX_en_B;
+    logic SpW_Packet_RX_en_B;
     logic empty_rx_fifo_B;
+    logic full_tx_fifo_B;
 
     logic [7:0] Time_Code_TX_B;
     logic [7:0] Time_Code_RX_B;
@@ -54,9 +56,10 @@ module tb_codec #(
         .D_out (D_A_to_B),
         .SpW_Packet_TX (SpW_Packet_TX_A),  
         .SpW_Packet_RX (SpW_Packet_RX_A),
-        .SpW_Packet_TX_valid(SpW_Packet_TX_valid_A),
-        .SpW_Packet_RX_valid(SpW_Packet_RX_valid_A),
+        .SpW_Packet_TX_en(SpW_Packet_TX_en_A),
+        .SpW_Packet_RX_en(SpW_Packet_RX_en_A),
         .empty_rx_fifo(empty_rx_fifo_A),
+        .full_tx_fifo(full_tx_fifo_A),
         .Time_Code_TX(Time_Code_TX_A),
         .Time_Code_RX(Time_Code_RX_A),
         .Time_Code_TX_valid(Time_Code_TX_valid_A),
@@ -76,11 +79,14 @@ module tb_codec #(
         .D_in (D_A_to_B),
         .S_out (S_B_to_A),
         .D_out (D_B_to_A),
+
         .SpW_Packet_TX (SpW_Packet_TX_B),
         .SpW_Packet_RX (SpW_Packet_RX_B),
-        .SpW_Packet_TX_valid(SpW_Packet_TX_valid_B),
-        .SpW_Packet_RX_valid(SpW_Packet_RX_valid_B),
+        .SpW_Packet_TX_en(SpW_Packet_TX_en_B),
+        .SpW_Packet_RX_en(SpW_Packet_RX_en_B),
         .empty_rx_fifo(empty_rx_fifo_B),
+        .full_tx_fifo(full_tx_fifo_B),
+
         .Time_Code_TX(Time_Code_TX_B),
         .Time_Code_RX(Time_Code_RX_B),
         .Time_Code_TX_valid(Time_Code_TX_valid_B),
@@ -132,19 +138,9 @@ module tb_codec #(
 
         repeat (13) @(posedge clk); // TODO para teste, ver como isso tem que ficar depois  
 
-        // Test Sending EOP and receve EOP
-        data_test = 9'b1_0000_0010; // set control bit + EOP 
-        $display("sending EOP (A -> B) : %b", data_test);
-        send_A_to_B_and_check(data_test);
-
         // load Tx data to send and  wait for valid data to appear on SpW Rx output
         data_test = 9'b0_0101_1110;
         $display("SpW Data Loaded (A -> B) : %b", data_test);
-        send_A_to_B_and_check(data_test);
-
-		// Test Sending EEP and receve EEP
-        data_test = 9'b1_0000_0001; // set control bit + EEP
-        $display("sending EEP (A -> B) : %b", data_test);
         send_A_to_B_and_check(data_test);
 
         repeat (13) @(posedge clk); // TODO para teste, ver como isso tem que ficar depois  
@@ -153,11 +149,11 @@ module tb_codec #(
         for (int i = 0; i < 16; i++) begin
             @(negedge clk);
             SpW_Packet_TX_A = stim_buf[i];
-            SpW_Packet_TX_valid_A = 1;
+            SpW_Packet_TX_en_A = 1;
             Time_Code_TX_valid_A = 0;
 
             @(negedge clk);
-            SpW_Packet_TX_valid_A = 1'b0;
+            SpW_Packet_TX_en_A = 1'b0;
         end
 
         repeat (3) @(posedge clk); // TODO para teste, ver como isso tem que ficar depois  
@@ -165,10 +161,10 @@ module tb_codec #(
         $display("getting Rx Data\n", data_test);
         for (int i = 0; i < 16; i++) begin
             fork
-                wait (SpW_Packet_RX_valid_B);
+                wait (SpW_Packet_RX_en_B);
                 begin
                     repeat (50) @(posedge clk);
-                    $error("Timeout: SpW_Packet_RX_valid_B did not assert within 50 cycles (idx %0d).", i);
+                    $error("Timeout: SpW_Packet_RX_en_B did not assert within 50 cycles (idx %0d).", i);
                     $finish;
                 end
             join_any
@@ -181,6 +177,16 @@ module tb_codec #(
                 $finish;
             end
         end
+
+        // Test Sending EOP and receve EOP
+        data_test = 9'b1_0000_0010; // set control bit + EOP 
+        $display("sending EOP (A -> B) : %b", data_test);
+        send_A_to_B_and_check(data_test);
+
+		// Test Sending EEP and receve EEP
+        data_test = 9'b1_0000_0001; // set control bit + EEP
+        $display("sending EEP (A -> B) : %b", data_test);
+        send_A_to_B_and_check(data_test);
 
         $display(">>>>>>>>>>>> TEST OK");
 
@@ -273,11 +279,11 @@ module tb_codec #(
         begin
             @(posedge clk);
             SpW_Packet_TX_A       = data;
-            SpW_Packet_TX_valid_A = 1;
+            SpW_Packet_TX_en_A = 1;
             Time_Code_TX_valid_A  = 0;
 
             @(posedge clk);
-            SpW_Packet_TX_valid_A = 0;
+            SpW_Packet_TX_en_A = 0;
         end
     endtask
 
@@ -285,11 +291,11 @@ module tb_codec #(
         begin
             @(posedge clk);
             SpW_Packet_TX_B       = data;
-            SpW_Packet_TX_valid_B = 1;
+            SpW_Packet_TX_en_B = 1;
             Time_Code_TX_valid_B  = 0;
 
             @(posedge clk);
-            SpW_Packet_TX_valid_B = 0;
+            SpW_Packet_TX_en_B = 0;
         end
     endtask
 
@@ -299,7 +305,7 @@ module tb_codec #(
             @(posedge clk);
             Time_Code_TX_A        = data;
             Time_Code_TX_valid_A  = 1;
-            SpW_Packet_TX_valid_A = 0;
+            SpW_Packet_TX_en_A = 0;
 
             @(posedge clk);
             Time_Code_TX_valid_A  = 0;
@@ -312,7 +318,7 @@ module tb_codec #(
             @(posedge clk);
             Time_Code_TX_B        = data;
             Time_Code_TX_valid_B  = 1;
-            SpW_Packet_TX_valid_B = 0;
+            SpW_Packet_TX_en_B = 0;
 
             @(posedge clk);
             Time_Code_TX_valid_B  = 0;
@@ -324,9 +330,9 @@ module tb_codec #(
         begin
             send_packet_A(data);
             wait_rx_valid_B();
-            SpW_Packet_RX_valid_B = 1;
+            SpW_Packet_RX_en_B = 1;
             check_rx(data, SpW_Packet_RX_B, "A->B");
-            SpW_Packet_RX_valid_B = 0;
+            SpW_Packet_RX_en_B = 0;
         end
     endtask
 
@@ -334,9 +340,9 @@ module tb_codec #(
         begin
             send_packet_B(data);
             wait_rx_valid_A();
-            SpW_Packet_RX_valid_A = 1;
+            SpW_Packet_RX_en_A = 1;
             check_rx(data, SpW_Packet_RX_A, "B->A");
-            SpW_Packet_RX_valid_A = 1;
+            SpW_Packet_RX_en_A = 1;
 
         end
     endtask
