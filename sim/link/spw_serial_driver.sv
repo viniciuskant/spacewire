@@ -17,13 +17,12 @@ package serial_driver_pkg;
     realtime bit_period = 100ns; // default 10MHz rate
     spw_encoder_util encoder;
 
-    bit last_d;
-    bit last_s;
+    bit last_d = 0;
+    bit last_s = 0;
 
     function new(string name, uvm_component parent);
       super.new(name, parent);
       ap = new("ap", this);
-      reset();
     endfunction
 
     virtual function automatic void reset();
@@ -50,6 +49,8 @@ package serial_driver_pkg;
       spw_serial_base_item item;
       spw_serial_char_item ch_item;
       spw_serial_config_item cfg_item;
+
+      reset();
 
       forever begin
         seq_item_port.get_next_item(item);

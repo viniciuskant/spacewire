@@ -50,6 +50,9 @@ package serial_item_pkg;
       super.new(name);
     endfunction
 
+    constraint c_typ_before {
+      solve typ before data;
+    }
     constraint ctl_no_data {
       (typ != SPW_CHAR_DATA && typ != SPW_CHAR_TIMECODE) -> (data == 0);
     }

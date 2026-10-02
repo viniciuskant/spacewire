@@ -10,6 +10,8 @@ package selftest_checker_pkg;
     uvm_tlm_analysis_fifo #(spw_serial_char_item) driver_fifo;
     uvm_tlm_analysis_fifo #(spw_serial_char_item) mon_rx_fifo;
 
+    int items_checked = 0;
+
     function new(string name, uvm_component parent);
       super.new(name, parent);
       driver_fifo = new("driver_fifo", this);
@@ -40,7 +42,41 @@ package selftest_checker_pkg;
           )
         end
         exp_item = next_exp_item;
+
+        items_checked++;
       end
     endtask
+    // 3. Add the check_phase to catch trapped items and dead monitors
+    virtual function void check_phase(uvm_phase phase);
+      super.check_phase(phase);
+
+      // If the monitor was completely dead
+      if (items_checked == 0) begin
+        `uvm_error(
+          "INTF_CHK",
+          "Simulation ended with 0 items checked! Monitor is likely dead or disconnected."
+        )
+      end
+      else begin
+        `uvm_info("INTF_CHK", $sformatf("Successfully checked %0d items.", items_checked), UVM_LOW)
+      end
+
+      // If the sequence sent items but the monitor missed some
+      if (driver_fifo.used() > 0) begin
+        `uvm_error(
+          "INTF_CHK",
+          $sformatf("Test ended with %0d unchecked expected items in driver_fifo!", driver_fifo.used())
+        )
+      end
+
+      // If the monitor saw garbage items the sequence didn't send
+      if (mon_rx_fifo.used() > 0) begin
+        `uvm_error(
+          "INTF_CHK",
+          $sformatf("Test ended with %0d unexpected actual items in mon_rx_fifo!", mon_rx_fifo.used())
+        )
+      end
+    endfunction
+
   endclass
 endpackage
