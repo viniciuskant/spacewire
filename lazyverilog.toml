@@ -1,0 +1,13 @@
+[design]
+vcode = "lazyverilog.f"
+define = ["UVM_NO_DPI"]
+
+[compilation]
+background_compilation = true
+
+[format]
+enable_format_on_save = true
+indent_size = 2
+
+[lint]
+enable = true
