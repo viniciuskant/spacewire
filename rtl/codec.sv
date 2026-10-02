@@ -16,6 +16,7 @@ module codec #(
     //matrix de roteamento
     input [8:0] SpW_Packet_TX, 
     input SpW_Packet_TX_en,
+    output full_tx_fifo,
     output [8:0] SpW_Packet_RX,
     input SpW_Packet_RX_en,
     output empty_rx_fifo,
@@ -32,7 +33,6 @@ module codec #(
     logic wr_en_fifo_rx;
     logic [8:0] wr_data_fifo_tx; // TODO verificar a largura de bits
     logic wr_en_fifo_tx;
-    logic full_fifo_tx;
     logic empty_tx_fifo;
 
     rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) dut_rx_fifo (
@@ -56,7 +56,7 @@ module codec #(
 
         .wr_data_i(SpW_Packet_TX),
         .wr_en_i(SpW_Packet_TX_en),
-        .full_o(full_fifo_tx),
+        .full_o(full_tx_fifo),
 
         .rd_data_o(wr_data_fifo_tx),
         .rd_en_i(wr_en_fifo_tx),
