@@ -11,9 +11,7 @@ module tx_fifo #(
 
     input  logic                  rd_en_i,
     output logic [DATA_WIDTH-1:0] rd_data_o,
-    output logic                  empty_o,
-
-    output logic [$clog2(DEPTH+1)-1:0] free_space_o
+    output logic                  empty_o
 );
 
     localparam int ADDR_WIDTH = $clog2(DEPTH);
@@ -28,8 +26,6 @@ module tx_fifo #(
     assign full_o  = (wr_ptr[ADDR_WIDTH] != rd_ptr[ADDR_WIDTH]) &&
                       (wr_ptr[ADDR_WIDTH-1:0] == rd_ptr[ADDR_WIDTH-1:0]);
     assign empty_o = (wr_ptr == rd_ptr);
-
-    assign free_space_o = DEPTH - (wr_ptr - rd_ptr);
 
     assign rd_data_o = mem[rd_addr];
 

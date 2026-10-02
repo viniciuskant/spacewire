@@ -87,7 +87,7 @@ module rx_char (
         unique case (state)
             ST_HUNT_NULL: begin
                 if (bit_valid_i) begin
-                    hunt_sh_n = {hunt_sh, bit_i} & 6'h3F; // descarta o bit mais antigo (Icarus ficava avisando)
+                    hunt_sh_n = {hunt_sh, bit_i}[5:0]; // descarta o bit mais antigo (Icarus ficava avisando)
                     if ({hunt_sh, bit_i} == NULL_SYNC_PATTERN) begin
                         esc_pending_n     = 1'b1;
                         ctrl_code_n       = CODE_FCT;
@@ -125,7 +125,7 @@ module rx_char (
                         else                 ctrl_code_n[0] = bit_i;
                     end else begin
                         // dado, 8 bits: LSB primeiro = direta
-                        data_acc_n[bit_idx] = bit_i;
+                        data_acc_n[bit_idx] = bit_i; //TODO verificar a lógica, mas talvez bit_idx possar ser de 3 bits
                     end
 
                     if (bit_idx == bit_cnt - 4'd1)

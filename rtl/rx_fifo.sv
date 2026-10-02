@@ -8,7 +8,7 @@ module rx_fifo #(
 
     input  logic                  wr_en_i,
     input  logic [DATA_WIDTH-1:0] wr_data_i,
-    output logic                  full_o,
+    output logic                  full_o,  // acho que é uma saída desnecessário
 
     input  logic                  rd_en_i,
     output logic [DATA_WIDTH-1:0] rd_data_o,

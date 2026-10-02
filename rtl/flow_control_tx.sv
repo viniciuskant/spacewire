@@ -9,8 +9,8 @@ module flow_control_tx (
     output logic sending_allowed
 );
 
-    localparam int MAX_CREDITS = 56;
-    localparam int FCT_GRANT   = 8;
+    localparam logic [6:0] MAX_CREDITS = 56;
+    localparam logic [6:0] FCT_GRANT   = 8;
 
     logic [6:0] credits; //no máximo 7 FCT pendentes, 56 pacotes, 7 bits
 

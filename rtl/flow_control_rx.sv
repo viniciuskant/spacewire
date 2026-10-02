@@ -11,8 +11,8 @@ module flow_control_rx #(
     output logic send_FCT
 );
 
-    localparam int MAX_CREDITS = 56;
-    localparam int FCT_GRANT   = 8;
+    localparam logic [6:0] MAX_CREDITS = 56;
+    localparam logic [6:0] FCT_GRANT   = 8;
 
     logic [6:0] credits;
 

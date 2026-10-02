@@ -1,19 +1,19 @@
 // Utilizando Icarus pra rodar o sv
 module tx_char (
-    input  logic clk,
-    input  logic rst_n,
+    input logic clk,
+    input logic rst_n,
 
-    input  logic bit_tick_i,
+    input logic bit_tick_i,
 
     // Pedidos de envio (arbitrados por prioridade fixa)
-    input  logic send_data_i,
-    input  logic [7:0] data_i,
-    input  logic send_fct_i,
-    input  logic send_eop_i,
-    input  logic send_eep_i,
-    input  logic send_null_i,
-    input  logic send_timecode_i,
-    input  logic [7:0] timecode_i,
+    input logic send_data_i,
+    input logic [7:0] data_i,
+    input logic send_fct_i,
+    input logic send_eop_i,
+    input logic send_eep_i,
+    input logic send_null_i,
+    input logic send_timecode_i,
+    input logic [7:0] timecode_i,
 
     output logic char_ack_o,
 

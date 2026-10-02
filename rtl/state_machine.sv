@@ -20,7 +20,8 @@ module state_machine #(
     output logic rst_n_tx,
     output logic send_FCT,
     output logic send_Null,
-    output logic send_NChar,
+    output logic send_EOP,
+    output logic send_EEP,
 
     // FSM
     input logic link_disabled,
@@ -31,6 +32,11 @@ module state_machine #(
     // TODO: por hora vou deixar assim
     logic auto_start;
     assign auto_start = 1'b1;
+
+    // TODO 3.6 Link error Recovery:
+    // faltou a parte de send_eop e eep
+    assign send_EEP = 0;
+    assign send_EOP = 0;
 
     //temporizador
     logic timer_en;
@@ -157,7 +163,6 @@ module state_machine #(
         rst_n_tx = 1'b1;
         send_FCT = 1'b0;
         send_Null = 1'b0;
-        send_NChar = 1'b0;
         run_state = 1'b0;
 
         case (current_state)
@@ -191,11 +196,19 @@ module state_machine #(
 
             RUN: begin
                 en_tx = 1'b1;
-                send_FCT = 1'b1;
-                send_NChar = 1'b1;
-                send_Null = 1'b1;
+                send_FCT = 1'b0;
+                send_Null = 1'b0;
                 en_rx = 1'b1;
                 run_state = 1'b1;
+            end
+            default: begin
+                en_rx = 1'b0;
+                rst_n_rx = 1'b1;
+                en_tx = 1'b0;
+                rst_n_tx = 1'b1;
+                send_FCT = 1'b0;
+                send_Null = 1'b0;
+                run_state = 1'b0;
             end
         endcase
     end
