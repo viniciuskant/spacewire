@@ -9,7 +9,7 @@ sim/link/spw_host_driver.sv
 sim/link/spw_host_monitor.sv
 sim/link/spw_selftest_agent.sv
 sim/link/spw_selftest_env.sv
-sim/link/spw_vip_selftest_seq.sv
-sim/link/spw_vip_checker.sv
+sim/link/spw_selftest_seq.sv
+sim/link/spw_checker.sv
 sim/link/spw_selftest_test.sv
-sim/link/spw_vip_selftest_top.sv
+sim/link/spw_selftest_top.sv
