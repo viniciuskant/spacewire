@@ -7,7 +7,7 @@ clean:
 	rm -rf work
 
 selftest:
-	mkdir -p work && cd work && vcs -F $(SIM_ROOT)/selftest.f $(VCS_ARGS)
+	mkdir -p work && cd work && vcs -F ../$(SIM_ROOT)/selftest.f $(VCS_ARGS)
 	cd work && ./simv -l run.log +UVM_TESTNAME=spw_selftest_test +UVM_VERBOSITY=UVM_LOW
 
 .PHONY: clean

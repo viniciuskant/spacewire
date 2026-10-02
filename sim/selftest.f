@@ -1,13 +1,12 @@
 link/spw_defines.sv
 link/spw_codec_utils.sv
-link/spw_host_if.sv
 link/spw_serial_if.sv
 link/spw_serial_item.sv
 link/spw_serial_driver.sv
 link/spw_serial_monitor.sv
 link/spw_selftest_agent.sv
+link/spw_selftest_checker.sv
 link/spw_selftest_env.sv
 link/spw_selftest_seq.sv
-link/spw_checker.sv
 link/spw_selftest_test.sv
 link/spw_selftest_top.sv
