@@ -13,19 +13,16 @@ module codec #(
     output S_out,
     output D_out,
 
-    // TODO sinais que se comunicam com a fifo, que no final estarão na matrix de roteamento
+    //matrix de roteamento
     input [8:0] SpW_Packet_TX, 
-    input SpW_Packet_TX_valid,
-
+    input SpW_Packet_TX_en,
     output [8:0] SpW_Packet_RX,
-    input SpW_Packet_RX_valid,
+    input SpW_Packet_RX_en,
     output empty_rx_fifo,
 
-    // TIME CODE
-    // TODO acho que também vão para a matrix de roteamento, mas por hora deixamos apenas a interface
+    // timecode
     input [7:0] Time_Code_TX,
     input Time_Code_TX_valid,
-
     output [7:0] Time_Code_RX,
     output Time_Code_RX_valid
 );
@@ -35,7 +32,6 @@ module codec #(
     logic wr_en_fifo_rx;
     logic [8:0] wr_data_fifo_tx; // TODO verificar a largura de bits
     logic wr_en_fifo_tx;
-    logic full_fifo_rx;
     logic full_fifo_tx;
     logic empty_tx_fifo;
 
@@ -46,10 +42,9 @@ module codec #(
 
         .wr_data_i(wr_data_fifo_rx),
         .wr_en_i(wr_en_fifo_rx),
-        .full_o(full_fifo_rx), //TODO acho que não é necessário
 
         // saída do módulo
-        .rd_en_i(SpW_Packet_RX_valid),
+        .rd_en_i(SpW_Packet_RX_en),
         .rd_data_o(SpW_Packet_RX),
         .empty_o(empty_rx_fifo),
         .free_space_o(free_slots_fifo_rx)
@@ -60,7 +55,7 @@ module codec #(
         .rst_n(rst_n),
 
         .wr_data_i(SpW_Packet_TX),
-        .wr_en_i(SpW_Packet_TX_valid),
+        .wr_en_i(SpW_Packet_TX_en),
         .full_o(full_fifo_tx),
 
         .rd_data_o(wr_data_fifo_tx),

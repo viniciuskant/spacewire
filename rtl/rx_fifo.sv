@@ -8,7 +8,6 @@ module rx_fifo #(
 
     input  logic                  wr_en_i,
     input  logic [DATA_WIDTH-1:0] wr_data_i,
-    output logic                  full_o,  // acho que é uma saída desnecessário
 
     input  logic                  rd_en_i,
     output logic [DATA_WIDTH-1:0] rd_data_o,
@@ -20,6 +19,7 @@ module rx_fifo #(
     localparam int ADDR_WIDTH = $clog2(DEPTH);
     localparam int PTR_WIDTH  = ADDR_WIDTH + 1; // 1 bit extra pra distinguir cheio/vazio
 
+    logic full;
     logic [DATA_WIDTH-1:0] mem [DEPTH];
 
     //binário -> Gray
@@ -49,11 +49,11 @@ module rx_fifo #(
             wr_ptr_bin  <= '0;
             wr_ptr_gray <= '0;
         end else begin
-            if (wr_en_i && !full_o) begin
+            if (wr_en_i && !full) begin
                 mem[wr_addr] <= wr_data_i;
                 wr_ptr_bin   <= wr_ptr_bin + 1'b1;
             end
-            wr_ptr_gray <= bin2gray(wr_ptr_bin + (wr_en_i && !full_o));
+            wr_ptr_gray <= bin2gray(wr_ptr_bin + (wr_en_i && !full));
         end
     end
 
@@ -67,7 +67,7 @@ module rx_fifo #(
         end
     end
 
-    assign full_o = (wr_ptr_gray == {~rd_ptr_gray_wsync2[PTR_WIDTH-1:PTR_WIDTH-2],
+    assign full = (wr_ptr_gray == {~rd_ptr_gray_wsync2[PTR_WIDTH-1:PTR_WIDTH-2],
                                        rd_ptr_gray_wsync2[PTR_WIDTH-3:0]});
 
     assign free_space_o = DEPTH - (wr_ptr_bin - gray2bin(rd_ptr_gray_wsync2));
