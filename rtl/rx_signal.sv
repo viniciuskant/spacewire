@@ -27,6 +27,10 @@ module rx_signal #(
     wire xor_now        = d_i ^ s_i;
     wire edge_detected  = (xor_now != xor_prev);
 
+    // TODO não recebe o clk, funciona apenas no xor, o DISCONNECT_TIMEOUT_NS vai para a 
+    // máquina de estados e se nenhum got do rx_char for aumento contador não zera
+
+    // TODO isso está errado pq o clk pode ser menor que o edge_detected
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             xor_prev       <= 1'b0;

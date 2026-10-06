@@ -4,7 +4,7 @@ module tb_codec #(
     parameter int DEPTH_FIFO = 2048,
     parameter int CLK_FREQ = 10_000_000,
     parameter int SYS_CLK_FREQ_HZ = 50_000_000,
-    parameter int DISCONNECT_TIMEOUT_NS = 850
+    parameter int DISCONNECT_TIMEOUT_NS = 8500
 );
 
     logic clk;
@@ -128,24 +128,24 @@ module tb_codec #(
 
         // load Tx data to send and  wait for valid data to appear on SpW Rx output
         data_test = 9'b0_0101_0110;
-        $display("SpW Data Loaded (A -> B) : %b", data_test);
+        $display("SpW Data Loaded (A -> B) : %x", data_test);
         send_A_to_B_and_check(data_test);
 
         // send time code and check for received time code
         timecode_test = 9'b1011_1100;
-        $display("sending time code (A -> B) : %b", timecode_test);
+        $display("sending time code (A -> B) : %x", timecode_test);
         send_tc_A_to_B_and_check(timecode_test);
 
         repeat (13) @(posedge clk); // TODO para teste, ver como isso tem que ficar depois  
 
         // load Tx data to send and  wait for valid data to appear on SpW Rx output
         data_test = 9'b0_0101_1110;
-        $display("SpW Data Loaded (A -> B) : %b", data_test);
+        $display("SpW Data Loaded (A -> B) : %x", data_test);
         send_A_to_B_and_check(data_test);
 
         repeat (13) @(posedge clk); // TODO para teste, ver como isso tem que ficar depois  
 
-        $display("sending 8 bytes of data (A -> B) : %b", data_test);
+        $display("sending 8 bytes of data (A -> B) : %x", data_test);
         for (int i = 0; i < 16; i++) begin
             @(negedge clk);
             SpW_Packet_TX_A = stim_buf[i];
@@ -158,34 +158,37 @@ module tb_codec #(
 
         repeat (3) @(posedge clk); // TODO para teste, ver como isso tem que ficar depois  
         
-        $display("getting Rx Data\n", data_test);
+        $display("getting Rx Data:");
         for (int i = 0; i < 16; i++) begin
             fork
-                wait (SpW_Packet_RX_en_B);
+                wait (!empty_rx_fifo_B);
                 begin
                     repeat (50) @(posedge clk);
-                    $error("Timeout: SpW_Packet_RX_en_B did not assert within 50 cycles (idx %0d).", i);
+                    $error("Timeout: !empty_rx_fifo_B did not assert within 50 cycles (idx %0d).", i);
                     $finish;
                 end
             join_any
             disable fork;
-
+            @(posedge clk);
             if (SpW_Packet_RX_B === ref_buf[i])
-                $display("OK  [%0d]: received = %h\n", i, SpW_Packet_RX_B);
+                $display("OK  [%0d]: received = %x", i, SpW_Packet_RX_B);
             else begin
-                $error("MISMATCH [%0d]: expected = %h | received = %h", i, ref_buf[i], SpW_Packet_RX_B);
+                $error("MISMATCH [%0d]: expected = %x | received = %x", i, ref_buf[i], SpW_Packet_RX_B);
                 $finish;
             end
+            SpW_Packet_RX_en_B = 1;
+            @(posedge clk);
+            SpW_Packet_RX_en_B = 0;
         end
 
         // Test Sending EOP and receve EOP
         data_test = 9'b1_0000_0010; // set control bit + EOP 
-        $display("sending EOP (A -> B) : %b", data_test);
+        $display("sending EOP (A -> B) : %x", data_test);
         send_A_to_B_and_check(data_test);
 
 		// Test Sending EEP and receve EEP
         data_test = 9'b1_0000_0001; // set control bit + EEP
-        $display("sending EEP (A -> B) : %b", data_test);
+        $display("sending EEP (A -> B) : %x", data_test);
         send_A_to_B_and_check(data_test);
 
         $display(">>>>>>>>>>>> TEST OK");
@@ -196,10 +199,10 @@ module tb_codec #(
     task automatic check_rx(input [8:0] expected, input [8:0] received, input string side);
         begin
             if (received === expected)
-                $display("OK [%s]: received = %b\n", side, received);
+                $display("OK [%s]: received = %x\n", side, received);
             else begin
                 #200;
-                $error("MISMATCH [%s]: expected = %b | received = %b",
+                $error("MISMATCH [%s]: expected = %x | received = %x",
                        side, expected, received);
                 $finish;
             end
@@ -209,9 +212,9 @@ module tb_codec #(
     task automatic check_tc(input [7:0] expected, input [7:0] received, input string side);
         begin
             if (received === expected)
-                $display("OK [%s]: received = %b\n", side, received);
+                $display("OK [%s]: received = %x\n", side, received);
             else begin
-                $error("MISMATCH [%s]: expected = %b | received = %b",
+                $error("MISMATCH [%s]: expected = %x | received = %x",
                        side, expected, received);
                 $finish;
             end
@@ -325,13 +328,14 @@ module tb_codec #(
         end
     endtask
 
-
     task automatic send_A_to_B_and_check(input [8:0] data);
         begin
             send_packet_A(data);
             wait_rx_valid_B();
-            SpW_Packet_RX_en_B = 1;
+            @(posedge clk);
             check_rx(data, SpW_Packet_RX_B, "A->B");
+            SpW_Packet_RX_en_B = 1;
+            @(posedge clk);
             SpW_Packet_RX_en_B = 0;
         end
     endtask
@@ -340,9 +344,11 @@ module tb_codec #(
         begin
             send_packet_B(data);
             wait_rx_valid_A();
-            SpW_Packet_RX_en_A = 1;
+            @(posedge clk);
             check_rx(data, SpW_Packet_RX_A, "B->A");
             SpW_Packet_RX_en_A = 1;
+            @(posedge clk);
+            SpW_Packet_RX_en_A = 0;
 
         end
     endtask

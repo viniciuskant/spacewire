@@ -8,6 +8,9 @@ module tx_char (
     // Pedidos de envio (arbitrados por prioridade fixa)
     input logic send_data_i,
     input logic [7:0] data_i,
+    output logic busy_o,
+
+
     input logic send_fct_i,
     input logic send_eop_i,
     input logic send_eep_i,
@@ -43,6 +46,7 @@ module tx_char (
 
     logic char_ack_n;
     logic bit_valid_n, bit_n;
+    logic busy_n;
 
     logic idle_settled, idle_settled_n;
 
@@ -61,11 +65,13 @@ module tx_char (
         bit_valid_n     = 1'b0;
         bit_n           = 1'b0;
         idle_settled_n  = (state == ST_IDLE);
-
+        busy_n = 1;
         unique case (state)
 
             ST_IDLE: begin
+
                 if (idle_settled) begin
+                    busy_n = 0;
                     // Arbitragem de prioridade fixa (Guia, p.56)
                     if (send_timecode_i) begin
                         cur_flag_n      = 1'b1; // ESC e caractere de controle
@@ -191,6 +197,7 @@ module tx_char (
             bit_valid_o   <= 1'b0;
             bit_o         <= 1'b0;
             idle_settled  <= 1'b0;
+            busy_o <= 0;
         end else begin
             state         <= state_n;
             part2_pending <= part2_pending_n;
@@ -204,6 +211,7 @@ module tx_char (
             bit_valid_o   <= bit_valid_n;
             bit_o         <= bit_n;
             idle_settled  <= idle_settled_n;
+            busy_o <= busy_n;
         end
     end
 

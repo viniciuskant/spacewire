@@ -5,7 +5,10 @@ module codec #(
     parameter int SYS_CLK_FREQ_HZ = 50_000_000,
     parameter int DISCONNECT_TIMEOUT_NS = 850
 )(
-    input clk,
+    input clk, // máquina de estados 50 MHz
+    // TODO falta o clk do tx de 200 MHz
+    // TODO falta um contador que vai para dividir esse clk para o tx
+
     input rst_n,
 
     input S_in,
@@ -75,7 +78,7 @@ module codec #(
 
     flow_control #(.DEPTH_FIFO(DEPTH_FIFO)) dut_fc(
         .clk(clk),
-        .rst_n(rst_n),
+        .rst_n(rst_n), // TODO falta arrumar aqui para ele funcionar com o rst da máquina de estado quadno rst o tx eo rx
         .run_state(run_state),
         .en_out_fifo_tx(en_out_fifo_tx),
         .got_FCT_rx(got_fct),
@@ -157,7 +160,7 @@ module codec #(
         .got_nchar_o(got_nchar),
         .got_eop_o(got_eop),
         .got_eep_o(got_eep),
-        .got_timecode_o(Time_Code_RX_valid),
+        .got_timecode_o(Time_Code_RX_valid), // TODO colocar aqui um sicronizador simples para poder passar para outra zona de clk
         .parity_err_o(parity_err),
         .escape_err_o(escape_err),
         .disconnect_o(link_disabled),

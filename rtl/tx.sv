@@ -26,8 +26,9 @@ module tx(
 
 );
     logic send_data;
+    logic busy;
     assign send_data = run_state & ~empty_fifo;
-    assign rd_en_fifo = 1; // TODO arrumar a lógica de leitura da fifo
+    assign rd_en_fifo = !busy; // TODO arrumar a lógica de leitura da fifo
 
     logic bit_valid;
     logic bit_signal;
@@ -52,6 +53,7 @@ module tx(
         // Pedidos de envio (arbitrados por prioridade fixa)
         .send_data_i(send_data),
         .data_i(rd_data_fifo),
+        .busy_o(busy),
         
         // interface com a maquina de estado
         .send_fct_i(send_fct_i),

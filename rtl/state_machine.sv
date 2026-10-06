@@ -3,6 +3,8 @@ module state_machine #(
 )(
     input logic clk,
     input logic rst_n,
+    // TODO ver se seria necessário receber o clk do rx para sincronizar alguns sinais
+
 
     // RX
     output logic en_rx,
