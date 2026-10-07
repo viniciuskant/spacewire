@@ -46,8 +46,17 @@ function run_flow_control_rx_test {
     ./obj_dir/Vtb_flow_control_rx
 }
 
+function run_rx_char_test {
+    echo "Executando teste rx_char"
+    verilator --top-module tb_rx_char \
+        "${TESTS_DIR}/tb_rx_char.sv" \
+        "${RTL_DIR}/rx_char.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_rx_char
+}
+
 function run_codec_test {
-    echo "Executando teste codec_tb"
+    echo "Executando teste codec_"
     verilator --top-module tb_codec \
         "${TESTS_DIR}/tb_codec.sv" \
         "${RTL_DIR}/codec.sv" \
@@ -76,6 +85,9 @@ case "${nome_do_teste}" in
         ;;
     codec)
         run_codec_test
+        ;;
+    rx_char)
+        run_rx_char_test
         ;;
     all)
         run_flow_control_tx_test
