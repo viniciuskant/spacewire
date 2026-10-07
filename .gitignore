@@ -11,6 +11,7 @@ waves/
 *.vvp
 *.wlf
 *.log
+*.err
 
 # Editor / OS
 .vscode/
