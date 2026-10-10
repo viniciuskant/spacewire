@@ -64,6 +64,15 @@ function run_rx_char_test {
     ./obj_dir/Vtb_rx_char
 }
 
+function run_rx_completo_test {
+    echo "Executando teste rx_completo"
+    verilator --top-module tb_rx_completo \
+        "${TESTS_DIR}/tb_rx_completo.sv" \
+        "${RTL_DIR}/rx_completo.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_rx_completo
+}
+
 function run_tx_signal_test {
     echo "Executando teste tx_signal"
     verilator --top-module tb_tx_signal \
@@ -94,6 +103,22 @@ function run_codec_test {
     ./obj_dir/Vtb_codec
 }
 
+
+function run_fifo_rx2fifo_test {
+    echo "Executando teste fifo1"
+    verilator --top-module tb_fifo1 \
+        "${RTL_DIR}/fifo_rx2fifo/tests/tb_fifo1.sv" \
+        "${RTL_DIR}/fifo_rx2fifo/rtl/fifo1.sv" \
+        "${RTL_DIR}/fifo_rx2fifo/rtl/fifomem.sv" \
+        "${RTL_DIR}/fifo_rx2fifo/rtl/rptr_empty.sv" \
+        "${RTL_DIR}/fifo_rx2fifo/rtl/sync_r2w.sv" \
+        "${RTL_DIR}/fifo_rx2fifo/rtl/sync_w2r.sv" \
+        "${RTL_DIR}/fifo_rx2fifo/rtl/wptr_full.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_fifo1
+}
+
+
 case "${nome_do_teste}" in
     flow_control_tx)
         run_flow_control_tx_test
@@ -110,8 +135,14 @@ case "${nome_do_teste}" in
     rx_char)
         run_rx_char_test
         ;;
+    rx_completo)
+        run_rx_completo_test
+        ;;
     tx_signal)
         run_tx_signal_test
+        ;;
+    fifo_rx2fifo)
+        run_fifo_rx2fifo_test
         ;;
     all)
         run_flow_control_tx_test
