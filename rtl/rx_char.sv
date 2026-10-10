@@ -93,7 +93,7 @@ module rx_char (
             if (!bit_idx[0])
                 bits_even[bit_idx[3:1]] <= bit_s;
             else
-                bits_odd [bit_idx[3:1]] <= bit_s;
+                bits_odd[bit_idx[3:1]] <= bit_s;
         end
     end
 

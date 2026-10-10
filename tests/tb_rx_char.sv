@@ -223,7 +223,7 @@ module tb_rx_char;
         $dumpvars(0, tb_rx_char);
 
         // fila de transmissão
-        tx_type[0]  = CH_FCT;      tx_payload[0]  = 8'h00;
+        tx_type[0]  = CH_NULL;     tx_payload[0]  = 8'h00;
         tx_type[1]  = CH_DATA;     tx_payload[1]  = 8'h11;
         tx_type[2]  = CH_TIMECODE; tx_payload[2]  = 8'h22;
         tx_type[3]  = CH_DATA;     tx_payload[3]  = 8'h5A;
@@ -233,7 +233,7 @@ module tb_rx_char;
         tx_type[7]  = CH_TIMECODE; tx_payload[7]  = 8'h88;
         tx_type[8]  = CH_EOP;      tx_payload[8]  = 8'h00;
         tx_type[9]  = CH_NULL;     tx_payload[9]  = 8'h00;
-        tx_type[10] = CH_NULL;     tx_payload[10] = 8'h00;
+        tx_type[10] = CH_FCT;      tx_payload[10] = 8'h00;
 
         tx_type[11] = CH_DATA;     tx_payload[11] = 8'hFF;
         tx_type[12] = CH_DATA;     tx_payload[12] = 8'h00;

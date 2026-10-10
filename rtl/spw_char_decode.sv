@@ -14,22 +14,21 @@ module spw_char_decode (
     output logic is_timecode
 
 );
+    assign rd_en_fifo_sync = !rd_empty_fifo_sync;
 
     always_ff @(posedge system_clk or negedge rst_n) begin
         if (!rst_n) begin
-            rd_en_fifo_sync <= 1'b0;
             payload <= 8'h00;
         end else begin
-            rd_en_fifo_sync <= 1'b0;
+            is_data <= 1'b0;
+            is_fct <= 1'b0;
+            is_eep <= 1'b0;
+            is_eop <= 1'b0;
+            is_null <= 1'b0;
+            is_timecode <= 1'b0;
 
-            if (!rd_empty_fifo_sync) begin
-                rd_en_fifo_sync <= 1'b1; // pop da FIFO
+            if (rd_en_fifo_sync) begin
                 payload <= rd_data_fifo_sync[9:2];
-                is_fct <= 1'b0;
-                is_eep <= 1'b0;
-                is_eop <= 1'b0;
-                is_null <= 1'b0;
-                is_timecode <= 1'b0;
 
                 case (rd_data_fifo_sync[1:0])
                     2'b00: begin

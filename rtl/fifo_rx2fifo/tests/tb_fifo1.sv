@@ -83,6 +83,9 @@ module tb_fifo1;
 
 
     initial begin
+        $dumpfile("waves/tb_fifo1.vcd");
+        $dumpvars(0, tb_fifo1);
+
         reset_system();
         #20;
 

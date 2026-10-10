@@ -8,7 +8,7 @@ module tx(
 
     // interface com a fifo
     output logic rd_en_fifo,
-    input logic [7:0] rd_data_fifo, // <- rd_data_o
+    input logic [8:0] rd_data_fifo, // <- rd_data_o
     input logic empty_fifo, // <- empty_o
 
     // interface com a maquina de estado

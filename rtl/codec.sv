@@ -80,7 +80,7 @@ module codec #(
 
 
     rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) dut_rx_fifo (
-        .wr_clk_i(rx_clk),
+        .wr_clk_i(system_clk),
         .rd_clk_i(system_clk), //TODO verificar se o clock da fifo é o clock do systema
         .rst_n(rst_n),
 
@@ -95,7 +95,7 @@ module codec #(
     );
 
     tx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) dut_tx_fifo (
-        .clk(clk),
+        .clk(tx_clk_div),
         .rst_n(rst_n),
 
         .wr_data_i(SpW_Packet_TX),
@@ -110,13 +110,14 @@ module codec #(
     logic run_state;
     logic en_out_fifo_tx;
     logic got_data, got_fct, got_eop, got_eep, got_null, got_timecode;
+
     logic [7:0] payload;
     logic sending_allowed;
     logic send_fct, send_fct_fc, send_fct_sm;
     assign send_fct = send_fct_fc | send_fct_sm;
 
     flow_control #(.DEPTH_FIFO(DEPTH_FIFO)) dut_fc(
-        .clk(clk),
+        .clk(system_clk),
         .rst_n(rst_n), // TODO falta arrumar aqui para ele funcionar com o rst da máquina de estado quadno rst o tx eo rx
         .run_state(run_state),
         .en_out_fifo_tx(en_out_fifo_tx),
@@ -131,8 +132,7 @@ module codec #(
     logic rx_Error;
     logic parity_err;
     logic escape_err;
-
-    assign rx_Error = escape_err | parity_err; // TODO arrumar isso depois
+    assign rx_Error = escape_err | parity_err;
 
     logic en_rx; // TODO analisar depois se os módulos possuem um sinal para ativar
     logic en_tx; // TODO analisar depois se os módulos possuem um sinal para ativar
@@ -144,7 +144,7 @@ module codec #(
                       // que seja um sinal externo para controle de quandoa ativar o rx
 
     state_machine #(.CLK_FREQ(CLK_FREQ))dut_sm(
-        .clk(clk),
+        .clk(system_clk),
         .rst_n(rst_n),
 
         // RX
@@ -172,8 +172,8 @@ module codec #(
         .run_state(run_state)
     );
 
-    logic wr_data_fifo_sync, wr_en_fifo_sync, wr_full_fifo_sync;
-    logic rd_data_fifo_sync, rd_en_fifo_sync, rd_empty_fifo_sync;
+    logic [9:0]wr_data_fifo_sync, wr_en_fifo_sync, wr_full_fifo_sync;
+    logic [9:0]rd_data_fifo_sync, rd_en_fifo_sync, rd_empty_fifo_sync;
 
     logic parity_err_ref_tx_clk, escape_err_ref_tx_clk;
 
@@ -250,11 +250,25 @@ module codec #(
         .is_timecode(got_timecode)
     );
 
+    assign Time_Code_RX = (got_timecode == 1) ? payload : '0;
+    assign Time_Code_RX_valid = got_timecode;
+    assign wr_en_fifo_rx = got_data | got_eep | got_eop;
+
+    always_comb begin
+        
+        case ({got_data, got_eep, got_eop})
+            3'b001: wr_data_fifo_rx = {1'b1, 6'b0, 2'b10}; // eop
+            3'b010: wr_data_fifo_rx = {1'b1, 6'b0, 2'b01}; // eep
+            3'b100: wr_data_fifo_rx = {1'b0, payload}; // data
+            default: wr_data_fifo_rx = '0;
+        endcase
+    end
+
     logic bit_tick; //TODO falta conectar
     logic char_ack_o; //TODO falta conectar
 
     tx dut_tx(
-        .clk(clk),
+        .clk(tx_clk_div),
         .rst_n(rst_n_tx),
 
         // interface com outro codec

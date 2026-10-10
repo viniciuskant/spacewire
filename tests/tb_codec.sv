@@ -10,7 +10,7 @@ module tb_codec #(
     logic system_clk;
     logic ref_tx_clk;
     logic [7:0] div_counter_tx;
-    assign div_counter_tx = 10;
+    assign div_counter_tx = 1;
     logic rst_n;
 
     // CODEC A 
@@ -105,7 +105,7 @@ module tb_codec #(
     always #20 system_clk = ~system_clk;
 
     initial ref_tx_clk = 0;
-    always #55 ref_tx_clk = ~ref_tx_clk;
+    always #5 ref_tx_clk = ~ref_tx_clk;
 
     logic [8:0] data_test;
     logic [7:0] timecode_test;
@@ -201,7 +201,7 @@ module tb_codec #(
         send_A_to_B_and_check(data_test);
 
         $display(">>>>>>>>>>>> TEST OK");
-
+        $finish;
     end
 
 

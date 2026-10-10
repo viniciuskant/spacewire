@@ -2,16 +2,16 @@ module rx_fifo #(
     parameter int DEPTH      = 32,  // Tem que ser 2^(x>=3) mult de 8
     parameter int DATA_WIDTH = 9
 ) (
-    input  logic wr_clk_i,
-    input  logic rd_clk_i,
-    input  logic rst_n,
+    input logic wr_clk_i,
+    input logic rd_clk_i,
+    input logic rst_n,
 
-    input  logic                  wr_en_i,
-    input  logic [DATA_WIDTH-1:0] wr_data_i,
+    input logic wr_en_i,
+    input logic [DATA_WIDTH-1:0] wr_data_i,
 
-    input  logic                  rd_en_i,
+    input logic rd_en_i,
     output logic [DATA_WIDTH-1:0] rd_data_o,
-    output logic                  empty_o,
+    output logic empty_o,
 
     output logic [$clog2(DEPTH+1)-1:0] free_space_o
 );
