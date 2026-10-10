@@ -2,13 +2,12 @@
 
 module tb_rx_signal;
 
-    logic ref_rx_clk, rx_clk, rst_n;
+    logic ref_rx_clk, rst_n;
     logic d_i, s_i;
     logic bit_valid_o, bit_o;
 
     rx_signal dut_rx_signal (
         .ref_rx_clk(ref_rx_clk), 
-        .rx_clk(rx_clk),
         .rst_n(rst_n),
         .d_i(d_i),
         .s_i(s_i),

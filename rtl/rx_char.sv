@@ -5,13 +5,8 @@ module rx_char (
     input logic bit_valid_i, // domínio rx_clk
     input logic bit_i, // domínio rx_clk
 
-    output logic [8:0] data_o,
+    output logic [9:0] data_o,
     output logic data_valid_o,
-    output logic [7:0] timecode_o,
-    output logic timecode_valid_o,
-
-    output logic got_fct,
-    output logic got_null,
 
     output logic parity_err_o,
     output logic escape_err_o
@@ -107,7 +102,7 @@ module rx_char (
         else done_i <= bit_pulse & last_bit;
     end
 
-    logic got_eop, got_eep, got_timecode, got_data;
+    logic got_eop, got_eep, got_timecode, got_data, got_fct, got_null;
     logic parity_calc;
 
     always_ff @(posedge ref_rx_clk or negedge rst_n) begin
@@ -193,25 +188,32 @@ module rx_char (
             escape_err_o <= (rx_data[5:4] != 2'b00);
     end
 
+ 
+    // codificação interna (últimos 3 bits da saída)
+    //      2'b00 Data Characters
+    //      2'b01 Control Characters
+    //      2'b10 NULL
+    //      2'b11 Timecode
+
     always_ff @(posedge ref_rx_clk or negedge rst_n) begin
         if (!rst_n) begin
             data_o <= 9'h000;
             data_valid_o <= 1'b0;
-            timecode_o <= 8'h00;
-            timecode_valid_o <= 1'b0;
         end else begin
             data_valid_o <= 1'b0;
-            timecode_valid_o <= 1'b0;
             if (done_i && !parity_err_o && !escape_err_o) begin
                 if (got_data) begin// data char
-                    data_o <= {rx_data[7:0], rx_flag};
+                    data_o <= {rx_data[7:0], 2'b00};
                     data_valid_o <= 1'b1;
-                end else if (got_eep || got_eop) begin // TODO control char, como NULL e FCT são para controle da máquina de estados ahei que não fazia sentido colocar eles
-                    data_o <= {6'd0, rx_data[1:0], rx_flag};
+                end else if (got_fct || got_eop || got_eep) begin
+                    data_o <= {6'd0, rx_data[1:0], 2'b01};
+                    data_valid_o <= 1'b1;
+                end else if (got_null) begin
+                    data_o <= {8'd0, 2'b10};
                     data_valid_o <= 1'b1;
                 end else if (got_timecode) begin //timecode
-                    timecode_o <= rx_data[11:4];
-                    timecode_valid_o <= 1'b1;
+                    data_o <= {rx_data[11:4], 2'b11};
+                    data_valid_o <= 1'b1;
                 end
             end
         end

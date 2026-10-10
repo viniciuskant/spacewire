@@ -10,7 +10,6 @@ module tx_char (
     input logic [7:0] data_i,
     output logic busy_o,
 
-
     input logic send_fct_i,
     input logic send_eop_i,
     input logic send_eep_i,

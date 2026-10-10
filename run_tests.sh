@@ -99,6 +99,14 @@ function run_codec_test {
         "${RTL_DIR}/tx_signal.sv" \
         "${RTL_DIR}/rx_fifo.sv" \
         "${RTL_DIR}/tx_fifo.sv" \
+        "${RTL_DIR}/cdc_sync.sv" \
+        "${RTL_DIR}/spw_char_decode.sv" \
+        "${RTL_DIR}/fifo_rx2fifo/rtl/fifo1.sv" \
+        "${RTL_DIR}/fifo_rx2fifo/rtl/fifomem.sv" \
+        "${RTL_DIR}/fifo_rx2fifo/rtl/rptr_empty.sv" \
+        "${RTL_DIR}/fifo_rx2fifo/rtl/sync_r2w.sv" \
+        "${RTL_DIR}/fifo_rx2fifo/rtl/sync_w2r.sv" \
+        "${RTL_DIR}/fifo_rx2fifo/rtl/wptr_full.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_codec
 }

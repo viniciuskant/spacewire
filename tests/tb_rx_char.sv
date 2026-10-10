@@ -9,7 +9,7 @@ module tb_rx_char;
 
     localparam REF_PERIOD = 5;
     localparam RX_DIV = 11;
-    localparam MAX_CHARS = 16;
+    localparam MAX_CHARS = 32;
 
     logic ref_rx_clk = 1;
     logic rx_clk = 0;
@@ -31,14 +31,10 @@ module tb_rx_char;
     // dut
     logic bit_valid_i = 0;
     logic bit_i = 0;
-    logic [8:0] data_o;
+    logic [9:0] data_o;
     logic data_valid_o;
-    logic [7:0] timecode_o;
-    logic timecode_valid_o;
     logic parity_err_o;
     logic escape_err_o;
-    logic got_fct;
-    logic got_null;
 
     rx_char dut (
         .ref_rx_clk (ref_rx_clk),
@@ -47,10 +43,6 @@ module tb_rx_char;
         .bit_i (bit_i),
         .data_o (data_o),
         .data_valid_o (data_valid_o),
-        .timecode_o (timecode_o),
-        .timecode_valid_o (timecode_valid_o),
-        .got_fct(got_fct),
-        .got_null(got_null),
         .parity_err_o (parity_err_o),
         .escape_err_o (escape_err_o)
     );
@@ -164,33 +156,57 @@ module tb_rx_char;
     int null_count = 0;
     int tc_count = 0;
 
+    localparam logic [1:0] T_DATA = 2'b00,
+                          T_CTRL = 2'b01,
+                          T_NULL = 2'b10,
+                          T_TC   = 2'b11;
+
+    localparam logic [1:0] C_FCT = 2'b00,
+                          C_EEP = 2'b01,
+                          C_EOP = 2'b10;
+
     always @(posedge ref_rx_clk) begin
         if (data_valid_o) begin
-            if (!data_o[0]) begin
-                data_count++;   
-                $display("[%0t] DATA 1: data=0x%02X flag=%b  (data_o=0b%b)", $time, data_o[8:1], data_o[0], data_o);
-            end else begin
-                if (data_o[2:1] == 2'b01) begin
-                    eep_count++;
-                    $display("[%0t] GOT EEP", $time);
+            case (data_o[1:0])
+
+                T_DATA: begin
+                    data_count++;
+                    $display("[%0t] DATA : data=0x%02X (data_o=0b%b)",
+                             $time, data_o[9:2], data_o);
                 end
-                if (data_o[2:1] == 2'b10) begin
-                    eop_count++;
-                    $display("[%0t] GOT EOP", $time);
+
+                T_CTRL: begin
+                    case (data_o[3:2])
+                        C_FCT: begin
+                            fct_count++;
+                            $display("[%0t] GOT FCT", $time);
+                        end
+                        C_EEP: begin
+                            eep_count++;
+                            $display("[%0t] GOT EEP", $time);
+                        end
+                        C_EOP: begin
+                            eop_count++;
+                            $display("[%0t] GOT EOP", $time);
+                        end
+                        default: begin
+                            $error("[%0t] *** FAIL: subtype de controle inválido = %b ***",
+                                   $time, data_o[3:2]);
+                        end
+                    endcase
                 end
-            end
-        end
-        if (timecode_valid_o) begin
-            tc_count++;
-            $display("[%0t] TCODE : 0x%02X", $time, timecode_o);
-        end
-        if (got_fct) begin
-            fct_count++;
-            $display("[%0t] GOT FCT", $time);
-        end
-        if (got_null) begin
-            null_count++;
-            $display("[%0t] GOT NULL", $time);
+
+                T_NULL: begin
+                    null_count++;
+                    $display("[%0t] GOT NULL", $time);
+                end
+
+                T_TC: begin
+                    tc_count++;
+                    $display("[%0t] TCODE : 0x%02X", $time, data_o[9:2]);
+                end
+
+            endcase
         end
     end
 

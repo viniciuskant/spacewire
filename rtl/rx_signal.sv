@@ -1,6 +1,5 @@
 module rx_signal (
     input logic ref_rx_clk, // clock de amostragem 200 MHz
-    output logic rx_clk,
     input logic rst_n,
 
     input logic d_i,
@@ -50,13 +49,6 @@ module rx_signal (
                 bit_valid_o <= 1'b0;
             end
         end
-    end
-
-    always_ff @(posedge ref_rx_clk or negedge rst_n) begin
-        if (!rst_n)
-            rx_clk <= 1'b0;
-        else if (xor_now != xor_prev)
-            rx_clk <= ~rx_clk;
     end
 
 endmodule
