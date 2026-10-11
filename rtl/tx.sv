@@ -28,12 +28,12 @@ module tx(
     logic send_data;
     logic busy;
     assign send_data = run_state & ~empty_fifo;
-    assign rd_en_fifo = !busy; // TODO arrumar a lógica de leitura da fifo
+    assign rd_en_fifo = !busy;
 
     logic bit_valid;
     logic bit_signal;
 
-    tx_signal dut_tx_signal (
+    tx_signal u_tx_signal (
         .clk(clk),
         .rst_n(rst_n),
 
@@ -44,7 +44,7 @@ module tx(
         .s_o(s_o)
     );
 
-    tx_char dut_tx_char (
+    tx_char u_tx_char (
         .clk(clk),
         .rst_n(rst_n),
 

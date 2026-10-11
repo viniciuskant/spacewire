@@ -9,8 +9,6 @@ module tb_codec #(
 
     logic system_clk;
     logic ref_tx_clk;
-    logic [7:0] div_counter_tx;
-    assign div_counter_tx = 1;
     logic rst_n;
 
     // CODEC A 
@@ -26,6 +24,8 @@ module tb_codec #(
     logic Time_Code_TX_valid_A;
     logic Time_Code_RX_valid_A;
 
+    logic [7:0] div_counter_tx_A;
+    assign div_counter_tx_A = 1;
 
     // CODEC B
     logic [8:0] SpW_Packet_TX_B;
@@ -40,6 +40,8 @@ module tb_codec #(
     logic Time_Code_TX_valid_B;
     logic Time_Code_RX_valid_B;
 
+    logic [7:0] div_counter_tx_B;
+    assign div_counter_tx_B = 2;
 
     logic S_A_to_B, D_A_to_B; // TX do codec A para RX o B
     logic S_B_to_A, D_B_to_A; // TX do codec B para RX o A
@@ -50,10 +52,10 @@ module tb_codec #(
         .CLK_FREQ (CLK_FREQ),
         .SYS_CLK_FREQ_HZ (SYS_CLK_FREQ_HZ),
         .DISCONNECT_TIMEOUT_NS (DISCONNECT_TIMEOUT_NS)
-    ) u_codec_A (
+    ) dut_codec_A (
         .system_clk (system_clk),
         .ref_tx_clk (ref_tx_clk),
-        .div_counter_tx(div_counter_tx),
+        .div_counter_tx(div_counter_tx_A),
         .rst_n (rst_n),
         .S_in (S_B_to_A),
         .D_in (D_B_to_A),
@@ -77,10 +79,10 @@ module tb_codec #(
         .CLK_FREQ (CLK_FREQ),
         .SYS_CLK_FREQ_HZ (SYS_CLK_FREQ_HZ),
         .DISCONNECT_TIMEOUT_NS (DISCONNECT_TIMEOUT_NS)
-    ) u_codec_B (
+    ) dut_codec_B (
         .system_clk (system_clk),
         .ref_tx_clk (ref_tx_clk),
-        .div_counter_tx(div_counter_tx),
+        .div_counter_tx(div_counter_tx_B),
         .rst_n (rst_n),
         .S_in (S_A_to_B),
         .D_in (D_A_to_B),
@@ -129,7 +131,7 @@ module tb_codec #(
         rst_n = 1;
         $display("\n\nwaiting for SpW Uplink to Connect");
 
-        wait(u_codec_A.run_state && u_codec_B.run_state);
+        wait(dut_codec_A.run_state && dut_codec_B.run_state);
         $display("SpW Uplink Connected !\n");
 
         repeat (10) @(posedge system_clk); // TODO para teste, ver como isso tem que ficar depois
@@ -141,7 +143,7 @@ module tb_codec #(
         send_A_to_B_and_check(data_test);
 
         // send time code and check for received time code
-        timecode_test = 9'b1011_1100;
+        timecode_test = 8'b1011_1100;
         $display("sending time code (A -> B) : %x", timecode_test);
         send_tc_A_to_B_and_check(timecode_test);
 

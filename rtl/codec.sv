@@ -34,52 +34,29 @@ module codec #(
     output Time_Code_RX_valid
 );
 
-    logic tx_clk_div; // clock programável durante o  Run
-    logic tx_clk_10MHz; //clock fixo para deteccao de disconnect (fora de Run)
-    logic tx_clk; // clock efetivo do TX selecionado pelo estado do link
-    logic rx_clk; // clock reconstinuido do rx
-
-    logic [7:0] counter_tx_div;
-    always_ff @(posedge ref_tx_clk or negedge rst_n) begin
-        if (!rst_n) begin
-            counter_tx_div <= 8'd0;
-            tx_clk_div <= 1'b0;
-        end else if (counter_tx_div >= div_counter_tx) begin
-            counter_tx_div <= 8'd0;
-            tx_clk_div <= ~tx_clk_div;
-        end else begin
-            counter_tx_div <= counter_tx_div + 8'd1;
-        end
-    end
-
     localparam int DIV_10MHz = (REF_TX_FREQ_HZ / (2*CLK_FREQ));
 
-    logic [7:0] counter_tx_10MHz;
-    always_ff @(posedge ref_tx_clk or negedge rst_n) begin
-        if (!rst_n) begin
-            counter_tx_10MHz <= 8'd0;
-            tx_clk_10MHz     <= 1'b0;
-        end else if (counter_tx_10MHz >= DIV_10MHz[7:0]) begin
-            counter_tx_10MHz <= 8'd0;
-            tx_clk_10MHz     <= ~tx_clk_10MHz;
-        end else begin
-            counter_tx_10MHz <= counter_tx_10MHz + 8'd1;
-        end
-    end
+    logic tx_clk;
+    logic [7:0] limit_counter_tx;
+    assign limit_counter_tx = run_state ? div_counter_tx : DIV_10MHz;
 
-    // TODO eu estaja errado, arrumar isso, é so um clk o que musa é o contador
-    assign tx_clk = run_state ? tx_clk_div : tx_clk_10MHz;
+    var_clk_divider u_var_clk_divider (
+        .clk(ref_tx_clk),
+        .rst_n(rst_n),
+        .new_limit(limit_counter_tx),
+        .clk_out(tx_clk)
+    );
 
-    logic [8:0] wr_data_fifo_rx; // TODO verificar a largura de bits
+    logic [8:0] wr_data_fifo_rx;
     logic wr_en_fifo_rx;
-    logic [8:0] wr_data_fifo_tx; // TODO verificar a largura de bits
+    logic [8:0] wr_data_fifo_tx;
     logic wr_en_fifo_tx;
     logic empty_tx_fifo;
 
     logic [$clog2(DEPTH_FIFO)-1:0] free_slots_fifo_rx;
 
 
-    rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) dut_rx_fifo (
+    rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_rx_fifo (
         .wr_clk_i(system_clk),
         .rd_clk_i(system_clk), //TODO verificar se o clock da fifo é o clock do systema
         .rst_n(rst_n),
@@ -94,8 +71,8 @@ module codec #(
         .free_space_o(free_slots_fifo_rx)
     );
 
-    tx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) dut_tx_fifo (
-        .clk(tx_clk_div),
+    tx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_tx_fifo (
+        .clk(tx_clk),
         .rst_n(rst_n),
 
         .wr_data_i(SpW_Packet_TX),
@@ -116,7 +93,7 @@ module codec #(
     logic send_fct, send_fct_fc, send_fct_sm;
     assign send_fct = send_fct_fc | send_fct_sm;
 
-    flow_control #(.DEPTH_FIFO(DEPTH_FIFO)) dut_fc(
+    flow_control #(.DEPTH_FIFO(DEPTH_FIFO)) u_fc(
         .clk(system_clk),
         .rst_n(rst_n), // TODO falta arrumar aqui para ele funcionar com o rst da máquina de estado quadno rst o tx eo rx
         .run_state(run_state),
@@ -139,11 +116,11 @@ module codec #(
     logic rst_n_rx;
     logic rst_n_tx;
     logic send_null, send_eep, send_eop;
-    logic link_disabled;
+    logic disconnect;
     logic start_link = 1; // TODO verificar o que seria essa start_link, mas creio
                       // que seja um sinal externo para controle de quandoa ativar o rx
 
-    state_machine #(.CLK_FREQ(CLK_FREQ))dut_sm(
+    state_machine #(.CLK_FREQ(CLK_FREQ))u_sm(
         .clk(system_clk),
         .rst_n(rst_n),
 
@@ -167,7 +144,7 @@ module codec #(
         .send_EEP(send_eep),
 
         // FSM
-        .link_disabled(link_disabled),
+        .disconnect(disconnect),
         .start_link(start_link),
         .run_state(run_state)
     );
@@ -177,7 +154,7 @@ module codec #(
 
     logic parity_err_ref_tx_clk, escape_err_ref_tx_clk;
 
-    rx dut_rx (
+    rx u_rx (
         .ref_rx_clk(ref_tx_clk),
         .rst_n(rst_n_rx),
 
@@ -218,7 +195,7 @@ module codec #(
 
     assign wrst_n_sync = wrst_n_sync_ff[1];
 
-    fifo1 #(.DSIZE(DSIZE), .ASIZE(ASIZE)) dut_fifo_sync(  
+    fifo1 #(.DSIZE(DSIZE), .ASIZE(ASIZE)) u_fifo_sync(  
         .wfull(wr_full_fifo_sync),
         .rempty(rd_empty_fifo_sync),
 
@@ -233,9 +210,33 @@ module codec #(
         .rrst_n(rst_n) // posso passar direto, pois se trata do clk do sistema
     );
 
+    localparam int unsigned DISCONNECT_TIMEOUT_CYCLES =
+        int'((longint'(DISCONNECT_TIMEOUT_NS) * longint'(SYS_CLK_FREQ_HZ)) / 1_000_000_000);
+
+    localparam int CNT_WIDTH = $clog2(DISCONNECT_TIMEOUT_CYCLES + 1);
+
+    logic [CNT_WIDTH-1:0]  disconnect_cnt;
+
+    always_ff @(posedge system_clk or negedge rst_n) begin
+        if (!rst_n) begin
+            disconnect_cnt <= '0;
+            disconnect <= 1'b0;
+        end else begin
+            disconnect <= 1'b0;
+            if (!rd_empty_fifo_sync) begin
+                disconnect_cnt <= '0;
+            end else if ((disconnect_cnt == (DISCONNECT_TIMEOUT_CYCLES - 1))) begin
+                disconnect <= 1'b1;
+                disconnect_cnt <= '0;
+            end else begin
+                disconnect_cnt <= disconnect_cnt + 1'b1;
+            end
+        end
+    end
+
 
     // decode
-    spw_char_decode dut_spw_char_decode(
+    spw_char_decode u_spw_char_decode(
         .system_clk(system_clk),
         .rst_n(rst_n),
         .rd_data_fifo_sync(rd_data_fifo_sync),
@@ -267,8 +268,8 @@ module codec #(
     logic bit_tick; //TODO falta conectar
     logic char_ack_o; //TODO falta conectar
 
-    tx dut_tx(
-        .clk(tx_clk_div),
+    tx u_tx(
+        .clk(tx_clk),
         .rst_n(rst_n_tx),
 
         // interface com outro codec

@@ -87,6 +87,7 @@ function run_codec_test {
     verilator --top-module tb_codec \
         "${TESTS_DIR}/tb_codec.sv" \
         "${RTL_DIR}/codec.sv" \
+        "${RTL_DIR}/var_clk_divider.sv" \
         "${RTL_DIR}/flow_control.sv" \
         "${RTL_DIR}/flow_control_rx.sv" \
         "${RTL_DIR}/flow_control_tx.sv" \

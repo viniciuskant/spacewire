@@ -25,7 +25,7 @@ module state_machine #(
     output logic send_EEP,
 
     // FSM
-    input logic link_disabled,
+    input logic disconnect,
     input logic start_link,
     output logic run_state
 );
@@ -113,7 +113,7 @@ module state_machine #(
                 if (rx_Error | got_FCT | got_N_Char | got_TimeCode) begin
                     next_state = ERRO_RESET;
                     timer_clear = 1'b1;
-                end else if (!link_disabled && (start_link || (auto_start && got_bit))) begin
+                end else if (!disconnect && (start_link || (auto_start && got_bit))) begin
                     next_state = STARTED;
                     timer_clear = 1'b1;
                 end
@@ -143,8 +143,8 @@ module state_machine #(
 
             RUN: begin
                 //no 4link, usa diferente, usa isso:
-                // if ((! (!link_disabled && (start_link || (auto_start and got_bit))) )|| rx_Error) begin
-                if (link_disabled || rx_Error) begin
+                // if ((! (!disconnect && (start_link || (auto_start and got_bit))) )|| rx_Error) begin
+                if (disconnect || rx_Error) begin
                     next_state = ERRO_RESET;
                     timer_clear = 1'b1;
                 end

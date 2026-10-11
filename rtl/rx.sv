@@ -18,7 +18,7 @@ module rx(
     logic bit_valid;
     logic bit_signal;
 
-    rx_signal dut_rx_signal(
+    rx_signal u_rx_signal(
         .ref_rx_clk(ref_rx_clk),
         .rst_n(rst_n),
 
@@ -29,7 +29,7 @@ module rx(
         .bit_o(bit_signal)
     );
 
-    rx_char dut_rx_char (
+    rx_char u_rx_char (
         .ref_rx_clk(ref_rx_clk),
         .rst_n(rst_n),
 
