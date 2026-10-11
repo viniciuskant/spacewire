@@ -1,5 +1,5 @@
 module rx_signal (
-    input logic ref_rx_clk, // clock de amostragem 200 MHz
+    input logic clk, // clock de amostragem 200 MHz
     input logic rst_n,
 
     input logic D_in,
@@ -9,12 +9,12 @@ module rx_signal (
     output logic bit_o
 );
 
-    // sincronização das entradas no domínio de ref_rx_clk, evitar instabilidade
+    // sincronização das entradas no domínio de clk, evitar instabilidade
     logic D_meta, S_meta;
     logic D_sync, S_sync; // estável
 
-    // TODO acho que não é para ser problema, pois o clk recuperado tem que ser um múltiplo do ref_rx_clk
-    always_ff @(posedge ref_rx_clk or negedge rst_n) begin
+    // TODO acho que não é para ser problema, pois o clk recuperado tem que ser um múltiplo do clk
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             D_meta <= 1'b0;
             S_meta <= 1'b0;
@@ -34,7 +34,7 @@ module rx_signal (
 
     assign xor_now = D_sync ^ S_sync;
 
-    always_ff @(posedge ref_rx_clk or negedge rst_n) begin
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             xor_prev <= 1'b0;
             bit_valid_o <= 1'b0;

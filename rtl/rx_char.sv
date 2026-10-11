@@ -1,5 +1,5 @@
 module rx_char (
-    input logic ref_rx_clk, // clock de referencia (200 MHz)
+    input logic clk, // clock de referencia (200 MHz)
     input logic rst_n,
 
     input logic bit_valid_i, // domínio rx_clk
@@ -13,23 +13,23 @@ module rx_char (
     output logic escape_err_o
 );
 
-    // CDC: bit_valid_i / bit_i  (rx_clk -> ref_rx_clk)
-    // rx_clk (reconstituído) é mais lento que ref_rx_clk, então bit_valid_i fica alto por varios ciclos de ref_rx_clk. 
+    // CDC: bit_valid_i / bit_i  (rx_clk -> clk)
+    // rx_clk (reconstituído) é mais lento que clk, então bit_valid_i fica alto por varios ciclos de clk. 
     // sincronizar (2 FFs) e detectar a borda de subida, gerando "bit_pulse" (1 ciclo por bit).
 
     logic bv_s1, bv_s2, bv_s3;
-    always_ff @(posedge ref_rx_clk or negedge rst_n) begin
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) {bv_s3, bv_s2, bv_s1} <= 3'b000;
         else {bv_s3, bv_s2, bv_s1} <= {bv_s2, bv_s1, bit_valid_i};
     end
 
     logic bit_pulse;
-    assign bit_pulse = bv_s2 & ~bv_s3; // 1 ciclo em ref_rx_clk por bit
+    assign bit_pulse = bv_s2 & ~bv_s3; // 1 ciclo em clk por bit
     assign got_bit_o = bit_pulse;
 
     // bit_i sincronizado nas mesmas etapas, bi_s2 alinhado com bv_s2
     logic bi_s1, bi_s2;
-    always_ff @(posedge ref_rx_clk or negedge rst_n) begin
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) {bi_s2, bi_s1} <= 2'b00;
         else {bi_s2, bi_s1} <= {bi_s1, bit_i};
     end
@@ -73,7 +73,7 @@ module rx_char (
         end
     end
 
-    always_ff @(posedge ref_rx_clk or negedge rst_n) begin
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             bit_idx <= 4'h0;
         else if (bit_pulse) begin
@@ -83,7 +83,7 @@ module rx_char (
     end
 
     //pega dos bits das duas bordas, já que basta olhar o valid (pulse)
-    always_ff @(posedge ref_rx_clk or negedge rst_n) begin
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             bits_even <= 8'h0;
             bits_odd <= 8'h0;
@@ -99,7 +99,7 @@ module rx_char (
         end
     end
 
-    always_ff @(posedge ref_rx_clk or negedge rst_n) begin
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) done_i <= 1'b0;
         else done_i <= bit_pulse & last_bit;
     end
@@ -107,7 +107,7 @@ module rx_char (
     logic got_eop, got_eep, got_timecode, got_data, got_fct, got_null;
     logic parity_calc;
 
-    always_ff @(posedge ref_rx_clk or negedge rst_n) begin
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             got_fct <= 1'b0;
             got_eop <= 1'b0;
@@ -160,7 +160,7 @@ module rx_char (
     logic prev_parity_calc_valid; // TODO acho que se deve desconsiderar a paridade do primeiro
     logic parity_err_reg;
 
-    always_ff @(posedge ref_rx_clk or negedge rst_n) begin
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             parity_err_reg <= 1'b0;
             prev_parity_calc <= 1'b0;
@@ -180,7 +180,7 @@ module rx_char (
 
     assign parity_err_o = parity_err_reg;
 
-    always_ff @(posedge ref_rx_clk or negedge rst_n) begin
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             escape_err_o <= 1'b0;
         else if (escape_err_o)
@@ -197,7 +197,7 @@ module rx_char (
     //      2'b10 NULL
     //      2'b11 Timecode
 
-    always_ff @(posedge ref_rx_clk or negedge rst_n) begin
+    always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             data_o <= 9'h000;
             data_valid_o <= 1'b0;

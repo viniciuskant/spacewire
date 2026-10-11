@@ -8,8 +8,8 @@ module codec #(
     parameter int DSIZE = 10,
     parameter int ASIZE = 4
 )(
-    input system_clk, // máquina de estados 50 MHz
-    input ref_tx_clk, // referência do tx 200 MHz
+    input clk_system, // máquina de estados 50 MHz
+    input clk_ref_tx, // referência do tx 200 MHz
     input [7:0] div_counter_tx,
 
     input rst_n,
@@ -36,15 +36,15 @@ module codec #(
 
     localparam int DIV_10MHz = (REF_TX_FREQ_HZ / (2*CLK_FREQ));
 
-    logic tx_clk;
+    logic clk_tx;
     logic [7:0] limit_counter_tx;
     assign limit_counter_tx = run_state ? div_counter_tx : DIV_10MHz;
 
     var_clk_divider u_var_clk_divider (
-        .clk(ref_tx_clk),
+        .clk(clk_ref_tx),
         .rst_n(rst_n),
         .new_limit(limit_counter_tx),
-        .clk_out(tx_clk)
+        .clk_out(clk_tx)
     );
 
     logic [8:0] wr_data_fifo_rx, rd_data_fifo_tx, rd_data_fifo_tx_temp;
@@ -54,8 +54,8 @@ module codec #(
 
 
     rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_rx_fifo (
-        .wr_clk_i(system_clk),
-        .rd_clk_i(system_clk), //TODO verificar se o clock da fifo é o clock do systema
+        .wr_clk_i(clk_system),
+        .rd_clk_i(clk_system), //TODO verificar se o clock da fifo é o clock do systema
         .rst_n(rst_n),
 
         .wr_data_i(wr_data_fifo_rx),
@@ -69,7 +69,7 @@ module codec #(
     );
 
     tx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_tx_fifo (
-        .clk(tx_clk),
+        .clk(clk_tx),
         .rst_n(rst_n),
 
         .wr_data_i(SpW_Packet_TX),
@@ -83,10 +83,11 @@ module codec #(
 
     // Módulo para lisar com os erros, colocando EEP no final e esvaziando até o EOP
     // TODO verificar se isso pode dar conflito se o EOP estiver muito longo
-    // TODO arrumar a questão de regiões de clk, pois alguns sinais estão em system_clk e 
-    // outros em tx_clk
+    // TODO arrumar a questão de regiões de clk, pois alguns sinais estão em clk_system e 
+    // outros em clk_tx
+    // TODO falta fazer um teste para analisar esse esse mecânismo está seguindo a especificação 
     error_cleanup_fsm u_error_cleanup_fsm (
-        .clk (system_clk),
+        .clk (clk_system),
         .rst_n (rst_n),
         .run_state (run_state),
         .rx_Error (rx_Error),
@@ -109,7 +110,7 @@ module codec #(
     assign send_fct = send_fct_fc | send_fct_sm;
 
     flow_control #(.DEPTH_FIFO(DEPTH_FIFO)) u_fc(
-        .clk(system_clk),
+        .clk(clk_system),
         .rst_n(rst_n), // TODO falta arrumar aqui para ele funcionar com o rst da máquina de estado quadno rst o tx eo rx
         .run_state(run_state),
         .en_out_fifo_tx(en_out_fifo_tx),
@@ -133,7 +134,7 @@ module codec #(
                            // que seja um sinal externo para controle de quandoa ativar o rx
 
     state_machine #(.CLK_FREQ(CLK_FREQ))u_sm(
-        .clk(system_clk),
+        .clk(clk_system),
         .rst_n(rst_n),
 
         // RX
@@ -163,42 +164,42 @@ module codec #(
 
     logic [9:0] wr_data_fifo_sync, rd_data_fifo_sync;
     logic wr_en_fifo_sync, wr_full_fifo_sync, rd_en_fifo_sync, rd_empty_fifo_sync;
-    logic got_bit_ref_tx_clk, parity_err_ref_tx_clk, escape_err_ref_tx_clk;
+    logic got_bit_clk_ref_tx, parity_err_clk_ref_tx, escape_err_clk_ref_tx;
 
     rx u_rx (
-        .ref_rx_clk(ref_tx_clk),
+        .ref_rx_clk(clk_ref_tx),
         .rst_n(rst_n_rx),
         .D_in(D_in),
         .S_in(S_in),
         .data_o(wr_data_fifo_sync),
         .data_valid_o(wr_en_fifo_sync),
-        .got_bit_o(got_bit_ref_tx_clk),
-        .parity_err_o(parity_err_ref_tx_clk),
-        .escape_err_o(escape_err_ref_tx_clk)
+        .got_bit_o(got_bit_clk_ref_tx),
+        .parity_err_o(parity_err_clk_ref_tx),
+        .escape_err_o(escape_err_clk_ref_tx)
     );
 
     cdc_sync #(.STAGES(2)) u_got_bit_sync (
-        .clk(system_clk),
-        .d(got_bit_ref_tx_clk),
+        .clk(clk_system),
+        .d(got_bit_clk_ref_tx),
         .q(got_bit)
     );
 
     cdc_sync #(.STAGES(2)) u_parity_err_sync (
-        .clk(system_clk),
-        .d(parity_err_ref_tx_clk),
+        .clk(clk_system),
+        .d(parity_err_clk_ref_tx),
         .q(parity_err)
     );
 
     cdc_sync #(.STAGES(2)) u_escape_err_sync (
-        .clk(system_clk),
-        .d(escape_err_ref_tx_clk),
+        .clk(clk_system),
+        .d(escape_err_clk_ref_tx),
         .q(escape_err)
     );
 
     logic [1:0] wrst_n_sync_ff;
     logic  wrst_n_sync;
 
-    always_ff @(posedge ref_tx_clk or negedge rst_n) begin
+    always_ff @(posedge clk_ref_tx or negedge rst_n) begin
         if (!rst_n)
             wrst_n_sync_ff <= 2'b00;
         else
@@ -207,16 +208,16 @@ module codec #(
 
     assign wrst_n_sync = wrst_n_sync_ff[1];
 
-    fifo1 #(.DSIZE(DSIZE), .ASIZE(ASIZE)) u_fifo_sync(  
+    fifo1 #(.DSIZE(DSIZE), .ASIZE(ASIZE)) u_fifo_sync_rx(  
         .wfull(wr_full_fifo_sync),
         .rempty(rd_empty_fifo_sync),
         .wdata(wr_data_fifo_sync),
         .winc(wr_en_fifo_sync), 
-        .wclk(ref_tx_clk),
+        .wclk(clk_ref_tx),
         .wrst_n(wrst_n_sync),
         .rdata(rd_data_fifo_sync),
         .rinc(rd_en_fifo_sync),
-        .rclk(system_clk),
+        .rclk(clk_system),
         .rrst_n(rst_n) // posso passar direto, pois se trata do clk do sistema
     );
 
@@ -227,7 +228,7 @@ module codec #(
 
     logic [CNT_WIDTH-1:0]  disconnect_cnt;
 
-    always_ff @(posedge system_clk or negedge rst_n) begin
+    always_ff @(posedge clk_system or negedge rst_n) begin
         if (!rst_n) begin
             disconnect_cnt <= '0;
             disconnect <= 1'b0;
@@ -247,7 +248,7 @@ module codec #(
 
     // decode
     spw_char_decode u_spw_char_decode(
-        .system_clk(system_clk),
+        .clk_system(clk_system),
         .rst_n(rst_n),
         .rd_data_fifo_sync(rd_data_fifo_sync),
         .rd_en_fifo_sync(rd_en_fifo_sync),
@@ -278,7 +279,7 @@ module codec #(
     logic char_ack_o; //TODO falta conectar
 
     tx u_tx(
-        .clk(tx_clk),
+        .clk(clk_tx),
         .rst_n(rst_n_tx),
         .D_out(D_out),
         .S_out(S_out),

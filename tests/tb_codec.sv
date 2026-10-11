@@ -7,8 +7,8 @@ module tb_codec #(
     parameter int DISCONNECT_TIMEOUT_NS = 8500
 );
 
-    logic system_clk;
-    logic ref_tx_clk;
+    logic clk_system;
+    logic clk_ref_tx;
     logic rst_n;
 
     // CODEC A 
@@ -53,8 +53,8 @@ module tb_codec #(
         .SYS_CLK_FREQ_HZ (SYS_CLK_FREQ_HZ),
         .DISCONNECT_TIMEOUT_NS (DISCONNECT_TIMEOUT_NS)
     ) dut_codec_A (
-        .system_clk (system_clk),
-        .ref_tx_clk (ref_tx_clk),
+        .clk_system (clk_system),
+        .clk_ref_tx (clk_ref_tx),
         .div_counter_tx(div_counter_tx_A),
         .rst_n (rst_n),
         .S_in (S_B_to_A),
@@ -80,8 +80,8 @@ module tb_codec #(
         .SYS_CLK_FREQ_HZ (SYS_CLK_FREQ_HZ),
         .DISCONNECT_TIMEOUT_NS (DISCONNECT_TIMEOUT_NS)
     ) dut_codec_B (
-        .system_clk (system_clk),
-        .ref_tx_clk (ref_tx_clk),
+        .clk_system (clk_system),
+        .clk_ref_tx (clk_ref_tx),
         .div_counter_tx(div_counter_tx_B),
         .rst_n (rst_n),
         .S_in (S_A_to_B),
@@ -103,11 +103,11 @@ module tb_codec #(
     );
 
     //clock
-    initial system_clk = 0;
-    always #20 system_clk = ~system_clk;
+    initial clk_system = 0;
+    always #20 clk_system = ~clk_system;
 
-    initial ref_tx_clk = 0;
-    always #5 ref_tx_clk = ~ref_tx_clk;
+    initial clk_ref_tx = 0;
+    always #5 clk_ref_tx = ~clk_ref_tx;
 
     logic [8:0] data_test;
     logic [7:0] timecode_test;
@@ -127,14 +127,14 @@ module tb_codec #(
         end
 
         rst_n  = 0;
-        repeat (10) @(posedge system_clk);
+        repeat (10) @(posedge clk_system);
         rst_n = 1;
         $display("\n\nwaiting for SpW Uplink to Connect");
 
         wait(dut_codec_A.run_state && dut_codec_B.run_state);
         $display("SpW Uplink Connected !\n");
 
-        repeat (10) @(posedge system_clk); // TODO para teste, ver como isso tem que ficar depois
+        repeat (10) @(posedge clk_system); // TODO para teste, ver como isso tem que ficar depois
 
 
         // load Tx data to send and  wait for valid data to appear on SpW Rx output
@@ -147,40 +147,40 @@ module tb_codec #(
         $display("sending time code (A -> B) : %x", timecode_test);
         send_tc_A_to_B_and_check(timecode_test);
 
-        repeat (13) @(posedge system_clk); // TODO para teste, ver como isso tem que ficar depois  
+        repeat (13) @(posedge clk_system); // TODO para teste, ver como isso tem que ficar depois  
 
         // load Tx data to send and  wait for valid data to appear on SpW Rx output
         data_test = 9'b0_0101_1110;
         $display("SpW Data Loaded (A -> B) : %x", data_test);
         send_A_to_B_and_check(data_test);
 
-        repeat (13) @(posedge system_clk); // TODO para teste, ver como isso tem que ficar depois  
+        repeat (13) @(posedge clk_system); // TODO para teste, ver como isso tem que ficar depois  
 
         $display("sending 8 bytes of data (A -> B) : %x", data_test);
         for (int i = 0; i < 16; i++) begin
-            @(negedge system_clk);
+            @(negedge clk_system);
             SpW_Packet_TX_A = stim_buf[i];
             SpW_Packet_TX_en_A = 1;
             Time_Code_TX_valid_A = 0;
 
-            @(negedge system_clk);
+            @(negedge clk_system);
             SpW_Packet_TX_en_A = 1'b0;
         end
 
-        repeat (3) @(posedge system_clk); // TODO para teste, ver como isso tem que ficar depois  
+        repeat (3) @(posedge clk_system); // TODO para teste, ver como isso tem que ficar depois  
         
         $display("getting Rx Data:");
         for (int i = 0; i < 16; i++) begin
             fork
                 wait (!empty_rx_fifo_B);
                 begin
-                    repeat (50) @(posedge system_clk);
+                    repeat (50) @(posedge clk_system);
                     $error("Timeout: !empty_rx_fifo_B did not assert within 50 cycles (idx %0d).", i);
                     $finish;
                 end
             join_any
             disable fork;
-            @(posedge system_clk);
+            @(posedge clk_system);
             if (SpW_Packet_RX_B === ref_buf[i])
                 $display("OK  [%0d]: received = %x", i, SpW_Packet_RX_B);
             else begin
@@ -188,7 +188,7 @@ module tb_codec #(
                 $finish;
             end
             SpW_Packet_RX_en_B = 1;
-            @(posedge system_clk);
+            @(posedge clk_system);
             SpW_Packet_RX_en_B = 0;
         end
 
@@ -238,7 +238,7 @@ module tb_codec #(
             fork
                 wait (!empty_rx_fifo_B);
                 begin
-                    repeat (50) @(posedge system_clk);
+                    repeat (50) @(posedge clk_system);
                     $error("Timeout: empty_rx_fifo_B did not arrive within 50 cycles.");
                     $finish;
                 end
@@ -252,7 +252,7 @@ module tb_codec #(
             fork
                 wait (!empty_rx_fifo_A);
                 begin
-                    repeat (50) @(posedge system_clk);
+                    repeat (50) @(posedge clk_system);
                     $error("Timeout: empty_rx_fifo_A did not arrive within 50 cycles.");
                     $finish;
                 end
@@ -266,7 +266,7 @@ module tb_codec #(
             fork
                 wait (Time_Code_RX_valid_B);
                 begin
-                    repeat (50) @(posedge system_clk);
+                    repeat (50) @(posedge clk_system);
                     $error("Timeout: Time_Code_RX_valid_B did not arrive within 50 cycles.");
                     $finish;
                 end
@@ -280,7 +280,7 @@ module tb_codec #(
             fork
                 wait (Time_Code_RX_valid_A);
                 begin
-                    repeat (50) @(posedge system_clk);
+                    repeat (50) @(posedge clk_system);
                     $error("Timeout: Time_Code_RX_valid_A did not arrive within 50 cycles.");
                     $finish;
                 end
@@ -291,24 +291,24 @@ module tb_codec #(
 
     task automatic send_packet_A(input [8:0] data);
         begin
-            @(posedge system_clk);
+            @(posedge clk_system);
             SpW_Packet_TX_A       = data;
             SpW_Packet_TX_en_A = 1;
             Time_Code_TX_valid_A  = 0;
 
-            @(posedge system_clk);
+            @(posedge clk_system);
             SpW_Packet_TX_en_A = 0;
         end
     endtask
 
     task automatic send_packet_B(input [8:0] data);
         begin
-            @(posedge system_clk);
+            @(posedge clk_system);
             SpW_Packet_TX_B       = data;
             SpW_Packet_TX_en_B = 1;
             Time_Code_TX_valid_B  = 0;
 
-            @(posedge system_clk);
+            @(posedge clk_system);
             SpW_Packet_TX_en_B = 0;
         end
     endtask
@@ -316,12 +316,12 @@ module tb_codec #(
 
     task automatic send_tc_A(input [7:0] data);
         begin
-            @(posedge system_clk);
+            @(posedge clk_system);
             Time_Code_TX_A        = data;
             Time_Code_TX_valid_A  = 1;
             SpW_Packet_TX_en_A = 0;
 
-            @(posedge system_clk);
+            @(posedge clk_system);
             Time_Code_TX_valid_A  = 0;
         end
     endtask
@@ -329,12 +329,12 @@ module tb_codec #(
 
     task automatic send_tc_B(input [7:0] data);
         begin
-            @(posedge system_clk);
+            @(posedge clk_system);
             Time_Code_TX_B        = data;
             Time_Code_TX_valid_B  = 1;
             SpW_Packet_TX_en_B = 0;
 
-            @(posedge system_clk);
+            @(posedge clk_system);
             Time_Code_TX_valid_B  = 0;
         end
     endtask
@@ -343,10 +343,10 @@ module tb_codec #(
         begin
             send_packet_A(data);
             wait_rx_valid_B();
-            @(posedge system_clk);
+            @(posedge clk_system);
             check_rx(data, SpW_Packet_RX_B, "A->B");
             SpW_Packet_RX_en_B = 1;
-            @(posedge system_clk);
+            @(posedge clk_system);
             SpW_Packet_RX_en_B = 0;
         end
     endtask
@@ -355,10 +355,10 @@ module tb_codec #(
         begin
             send_packet_B(data);
             wait_rx_valid_A();
-            @(posedge system_clk);
+            @(posedge clk_system);
             check_rx(data, SpW_Packet_RX_A, "B->A");
             SpW_Packet_RX_en_A = 1;
-            @(posedge system_clk);
+            @(posedge clk_system);
             SpW_Packet_RX_en_A = 0;
 
         end

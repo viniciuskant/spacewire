@@ -1,5 +1,5 @@
 module spw_char_decode (
-    input logic system_clk,
+    input logic clk_system,
     input logic rst_n,
     input logic [9:0] rd_data_fifo_sync,
     input logic rd_empty_fifo_sync,
@@ -16,7 +16,7 @@ module spw_char_decode (
 );
     assign rd_en_fifo_sync = !rd_empty_fifo_sync;
 
-    always_ff @(posedge system_clk or negedge rst_n) begin
+    always_ff @(posedge clk_system or negedge rst_n) begin
         if (!rst_n) begin
             payload <= 8'h00;
         end else begin

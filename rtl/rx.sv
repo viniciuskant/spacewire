@@ -1,5 +1,5 @@
 module rx(
-    input logic ref_rx_clk,
+    input logic clk,
     input logic rst_n,
 
     // interface com outro codec
@@ -20,7 +20,7 @@ module rx(
     logic bit_signal;
 
     rx_signal u_rx_signal(
-        .ref_rx_clk(ref_rx_clk),
+        .clk(clk),
         .rst_n(rst_n),
 
         .D_in(D_in),
@@ -31,7 +31,7 @@ module rx(
     );
 
     rx_char u_rx_char (
-        .ref_rx_clk(ref_rx_clk),
+        .clk(clk),
         .rst_n(rst_n),
 
         .bit_valid_i(bit_valid),
