@@ -47,11 +47,8 @@ module codec #(
         .clk_out(tx_clk)
     );
 
-    logic [8:0] wr_data_fifo_rx;
-    logic wr_en_fifo_rx;
-    logic [8:0] wr_data_fifo_tx;
-    logic wr_en_fifo_tx;
-    logic empty_tx_fifo;
+    logic [8:0] wr_data_fifo_rx, rd_data_fifo_tx, rd_data_fifo_tx_temp;
+    logic wr_en_fifo_rx, rd_en_fifo_tx, rd_en_fifo_tx_temp, empty_tx_fifo, empty_tx_fifo_temp;
 
     logic [$clog2(DEPTH_FIFO)-1:0] free_slots_fifo_rx;
 
@@ -79,9 +76,27 @@ module codec #(
         .wr_en_i(SpW_Packet_TX_en),
         .full_o(full_tx_fifo),
 
-        .rd_data_o(wr_data_fifo_tx),
-        .rd_en_i(wr_en_fifo_tx),
-        .empty_o(empty_tx_fifo)
+        .rd_data_o(rd_data_fifo_tx_temp),
+        .rd_en_i(rd_en_fifo_tx_temp),
+        .empty_o(empty_tx_fifo_temp)
+    );
+
+    // Módulo para lisar com os erros, colocando EEP no final e esvaziando até o EOP
+    // TODO verificar se isso pode dar conflito se o EOP estiver muito longo
+    // TODO arrumar a questão de regiões de clk, pois alguns sinais estão em system_clk e 
+    // outros em tx_clk
+    error_cleanup_fsm u_error_cleanup_fsm (
+        .clk (system_clk),
+        .rst_n (rst_n),
+        .run_state (run_state),
+        .rx_Error (rx_Error),
+        .disconnect (disconnect),
+        .rd_en_fifo_tx (rd_en_fifo_tx),
+        .empty_tx_fifo_temp (empty_tx_fifo_temp),
+        .rd_data_fifo_tx_temp (rd_data_fifo_tx_temp),
+        .rd_data_fifo_tx (rd_data_fifo_tx),
+        .rd_en_fifo_tx_temp (rd_en_fifo_tx_temp),
+        .empty_tx_fifo (empty_tx_fifo)
     );
 
     logic run_state;
@@ -106,19 +121,16 @@ module codec #(
     );
 
     logic got_bit;
-    logic rx_Error;
-    logic parity_err;
-    logic escape_err;
+    logic rx_Error, parity_err, escape_err;
     assign rx_Error = escape_err | parity_err;
 
     logic en_rx; // TODO analisar depois se os módulos possuem um sinal para ativar
     logic en_tx; // TODO analisar depois se os módulos possuem um sinal para ativar
-    logic rst_n_rx;
-    logic rst_n_tx;
+    logic rst_n_rx, rst_n_tx;
     logic send_null, send_eep, send_eop;
-    logic disconnect;
-    logic start_link = 1; // TODO verificar o que seria essa start_link, mas creio
-                      // que seja um sinal externo para controle de quandoa ativar o rx
+    logic disconnect, start_link;
+    assign start_link = 1; // TODO verificar o que seria essa start_link, mas creio
+                           // que seja um sinal externo para controle de quandoa ativar o rx
 
     state_machine #(.CLK_FREQ(CLK_FREQ))u_sm(
         .clk(system_clk),
@@ -149,23 +161,17 @@ module codec #(
         .run_state(run_state)
     );
 
-    logic [9:0]wr_data_fifo_sync, wr_en_fifo_sync, wr_full_fifo_sync;
-    logic [9:0]rd_data_fifo_sync, rd_en_fifo_sync, rd_empty_fifo_sync;
-
+    logic [9:0] wr_data_fifo_sync, rd_data_fifo_sync;
+    logic wr_en_fifo_sync, wr_full_fifo_sync, rd_en_fifo_sync, rd_empty_fifo_sync;
     logic got_bit_ref_tx_clk, parity_err_ref_tx_clk, escape_err_ref_tx_clk;
 
     rx u_rx (
         .ref_rx_clk(ref_tx_clk),
         .rst_n(rst_n_rx),
-
-        // interface com outro codec
         .D_in(D_in),
         .S_in(S_in),
-
-        // interface com a fifo
         .data_o(wr_data_fifo_sync),
         .data_valid_o(wr_en_fifo_sync),
-
         .got_bit_o(got_bit_ref_tx_clk),
         .parity_err_o(parity_err_ref_tx_clk),
         .escape_err_o(escape_err_ref_tx_clk)
@@ -204,12 +210,10 @@ module codec #(
     fifo1 #(.DSIZE(DSIZE), .ASIZE(ASIZE)) u_fifo_sync(  
         .wfull(wr_full_fifo_sync),
         .rempty(rd_empty_fifo_sync),
-
         .wdata(wr_data_fifo_sync),
         .winc(wr_en_fifo_sync), 
         .wclk(ref_tx_clk),
         .wrst_n(wrst_n_sync),
-
         .rdata(rd_data_fifo_sync),
         .rinc(rd_en_fifo_sync),
         .rclk(system_clk),
@@ -276,17 +280,11 @@ module codec #(
     tx u_tx(
         .clk(tx_clk),
         .rst_n(rst_n_tx),
-
-        // interface com outro codec
         .D_out(D_out),
         .S_out(S_out),
-
-        // interface com a fifo
-        .rd_en_fifo(wr_en_fifo_tx),
-        .rd_data_fifo(wr_data_fifo_tx), 
+        .rd_en_fifo(rd_en_fifo_tx),
+        .rd_data_fifo(rd_data_fifo_tx), 
         .empty_fifo(empty_tx_fifo),
-
-        // interface com a maquina de estado
         .run_state(run_state),
         .bit_tick_i(1), // TODO perguntar o que seria isso
         .send_fct_i(send_fct),
@@ -294,11 +292,8 @@ module codec #(
         .send_eep_i(send_eep),
         .send_null_i(send_null),
         .char_ack_o(char_ack_o), // TODO perguntar o que seria isso
-
-        // vem direto sem passar pela fifo
         .send_timecode_i(Time_Code_TX_valid),
         .timecode_i(Time_Code_TX)
-
     );
 
 endmodule
