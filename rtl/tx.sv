@@ -3,8 +3,8 @@ module tx(
     input  logic rst_n,
 
     // interface com outro codec
-    output logic d_o,
-    output logic s_o,
+    output logic D_out,
+    output logic S_out,
 
     // interface com a fifo
     output logic rd_en_fifo,
@@ -40,8 +40,8 @@ module tx(
         .bit_valid_i(bit_valid),
         .bit_i(bit_signal),   
 
-        .d_o(d_o),
-        .s_o(s_o)
+        .D_out(D_out),
+        .S_out(S_out)
     );
 
     tx_char u_tx_char (

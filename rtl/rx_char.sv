@@ -8,6 +8,7 @@ module rx_char (
     output logic [9:0] data_o,
     output logic data_valid_o,
 
+    output logic got_bit_o,
     output logic parity_err_o,
     output logic escape_err_o
 );
@@ -24,6 +25,7 @@ module rx_char (
 
     logic bit_pulse;
     assign bit_pulse = bv_s2 & ~bv_s3; // 1 ciclo em ref_rx_clk por bit
+    assign got_bit_o = bit_pulse;
 
     // bit_i sincronizado nas mesmas etapas, bi_s2 alinhado com bv_s2
     logic bi_s1, bi_s2;

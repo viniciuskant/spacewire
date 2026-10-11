@@ -5,25 +5,25 @@ module tx_signal (
     input  logic bit_valid_i,
     input  logic bit_i,   
 
-    output logic d_o,
-    output logic s_o
+    output logic D_out,
+    output logic S_out
 );
 
-    logic d_reg;
-    logic s_reg;
+    logic D_reg;
+    logic S_reg;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            d_reg <= 1'b0;
-            s_reg <= 1'b0;
+            D_reg <= 1'b0;
+            S_reg <= 1'b0;
         end else if (bit_valid_i) begin
-            if (bit_i == d_reg)
-                s_reg <= ~s_reg; 
-            d_reg <= bit_i;
+            if (bit_i == D_reg)
+                S_reg <= ~S_reg; 
+            D_reg <= bit_i;
         end
     end
 
-    assign d_o = d_reg;
-    assign s_o = s_reg;
+    assign D_out = D_reg;
+    assign S_out = S_reg;
 
 endmodule

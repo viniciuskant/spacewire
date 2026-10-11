@@ -152,36 +152,42 @@ module codec #(
     logic [9:0]wr_data_fifo_sync, wr_en_fifo_sync, wr_full_fifo_sync;
     logic [9:0]rd_data_fifo_sync, rd_en_fifo_sync, rd_empty_fifo_sync;
 
-    logic parity_err_ref_tx_clk, escape_err_ref_tx_clk;
+    logic got_bit_ref_tx_clk, parity_err_ref_tx_clk, escape_err_ref_tx_clk;
 
     rx u_rx (
         .ref_rx_clk(ref_tx_clk),
         .rst_n(rst_n_rx),
 
         // interface com outro codec
-        .d_i(D_in),
-        .s_i(S_in),
+        .D_in(D_in),
+        .S_in(S_in),
 
         // interface com a fifo
         .data_o(wr_data_fifo_sync),
         .data_valid_o(wr_en_fifo_sync),
 
+        .got_bit_o(got_bit_ref_tx_clk),
         .parity_err_o(parity_err_ref_tx_clk),
         .escape_err_o(escape_err_ref_tx_clk)
     );
 
+    cdc_sync #(.STAGES(2)) u_got_bit_sync (
+        .clk(system_clk),
+        .d(got_bit_ref_tx_clk),
+        .q(got_bit)
+    );
+
     cdc_sync #(.STAGES(2)) u_parity_err_sync (
-        .clk (system_clk),
-        .d   (parity_err_ref_tx_clk),
-        .q   (parity_err)
+        .clk(system_clk),
+        .d(parity_err_ref_tx_clk),
+        .q(parity_err)
     );
 
     cdc_sync #(.STAGES(2)) u_escape_err_sync (
-        .clk (system_clk),
-        .d   (escape_err_ref_tx_clk),
-        .q   (escape_err)
+        .clk(system_clk),
+        .d(escape_err_ref_tx_clk),
+        .q(escape_err)
     );
-    
 
     logic [1:0] wrst_n_sync_ff;
     logic  wrst_n_sync;
@@ -256,7 +262,6 @@ module codec #(
     assign wr_en_fifo_rx = got_data | got_eep | got_eop;
 
     always_comb begin
-        
         case ({got_data, got_eep, got_eop})
             3'b001: wr_data_fifo_rx = {1'b1, 6'b0, 2'b10}; // eop
             3'b010: wr_data_fifo_rx = {1'b1, 6'b0, 2'b01}; // eep
@@ -273,8 +278,8 @@ module codec #(
         .rst_n(rst_n_tx),
 
         // interface com outro codec
-        .d_o(D_out),
-        .s_o(S_out),
+        .D_out(D_out),
+        .S_out(S_out),
 
         // interface com a fifo
         .rd_en_fifo(wr_en_fifo_tx),
