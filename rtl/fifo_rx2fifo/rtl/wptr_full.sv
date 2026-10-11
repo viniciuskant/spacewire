@@ -27,6 +27,7 @@ module wptr_full #(parameter ADDRSIZE = 4
     // (wgnext[ADDRSIZE-2:0]==wq2_rptr[ADDRSIZE-2:0]));
     //------------------------------------------------------------------
 
+    logic wfull_val;
     assign wfull_val = (wgraynext == {~wq2_rptr[ADDRSIZE:ADDRSIZE-1], wq2_rptr[ADDRSIZE-2:0]});
     always_ff @(posedge wclk or negedge wrst_n) begin
         if (!wrst_n) 

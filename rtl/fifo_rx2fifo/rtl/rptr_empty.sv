@@ -27,6 +27,7 @@ module rptr_empty #(parameter ADDRSIZE = 4
     //---------------------------------------------------------------
     // FIFO empty when the next rptr == synchronized wptr or on reset
     //---------------------------------------------------------------
+    logic rempty_val;
     assign rempty_val = (rgraynext == rq2_wptr);
 
     always_ff @(posedge rclk or negedge rrst_n) begin

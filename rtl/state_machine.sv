@@ -13,7 +13,6 @@ module state_machine #(
     input logic got_null,
     input logic got_TimeCode,
     input logic got_N_Char,
-    input logic got_Cred,
     input logic rx_Error,
 
     // TX

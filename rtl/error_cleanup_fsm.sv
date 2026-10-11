@@ -4,6 +4,7 @@ module error_cleanup_fsm (
     input logic run_state,
     input logic rx_Error,
     input logic disconnect,
+    input logic credit_err,
     input logic rd_en_fifo_tx,
     input logic empty_tx_fifo_temp,
     input logic [8:0] rd_data_fifo_tx_temp,
@@ -25,7 +26,7 @@ module error_cleanup_fsm (
         end else begin
             case (current_state)
                 WAIT_ERRO: begin
-                    if (run_state && (rx_Error || disconnect)) begin
+                    if (run_state && (rx_Error || disconnect || credit_err)) begin
                         current_state <= CLEAN_TX_FIFO;
                     end
                 end

@@ -1,5 +1,5 @@
 module codec #(
-    parameter int DEPTH_FIFO = 2048,
+    parameter int DEPTH_FIFO = 512,
     parameter int DATA_WIDTH_FIFO = 9,
     parameter int CLK_FREQ = 10_000_000,
     parameter int SYS_CLK_FREQ_HZ = 50_000_000,
@@ -50,7 +50,8 @@ module codec #(
     logic [8:0] wr_data_fifo_rx, rd_data_fifo_tx, rd_data_fifo_tx_temp;
     logic wr_en_fifo_rx, rd_en_fifo_tx, rd_en_fifo_tx_temp, empty_tx_fifo, empty_tx_fifo_temp;
 
-    logic [$clog2(DEPTH_FIFO)-1:0] free_slots_fifo_rx;
+    logic credit_err;
+    logic [$clog2(DEPTH_FIFO+1)-1:0] free_slots_fifo_rx;
 
 
     rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_rx_fifo (
@@ -67,6 +68,8 @@ module codec #(
         .empty_o(empty_rx_fifo),
         .free_space_o(free_slots_fifo_rx)
     );
+
+    assign credit_err = (free_slots_fifo_rx == '0) & wr_en_fifo_rx;
 
     tx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_tx_fifo (
         .clk(clk_tx),
@@ -92,6 +95,7 @@ module codec #(
         .run_state (run_state),
         .rx_Error (rx_Error),
         .disconnect (disconnect),
+        .credit_err (credit_err),
         .rd_en_fifo_tx (rd_en_fifo_tx),
         .empty_tx_fifo_temp (empty_tx_fifo_temp),
         .rd_data_fifo_tx_temp (rd_data_fifo_tx_temp),
@@ -101,7 +105,7 @@ module codec #(
     );
 
     logic run_state;
-    logic en_out_fifo_tx;
+
     logic got_data, got_fct, got_eop, got_eep, got_null, got_timecode;
 
     logic [7:0] payload;
@@ -113,7 +117,7 @@ module codec #(
         .clk(clk_system),
         .rst_n(rst_n), // TODO falta arrumar aqui para ele funcionar com o rst da máquina de estado quadno rst o tx eo rx
         .run_state(run_state),
-        .en_out_fifo_tx(en_out_fifo_tx),
+        .en_out_fifo_tx(!empty_tx_fifo_temp & rd_data_fifo_tx),
         .got_FCT_rx(got_fct),
         .sending_allowed(sending_allowed),
         .en_in_fifo_rx(wr_en_fifo_rx),
@@ -144,8 +148,7 @@ module codec #(
         .got_FCT(got_fct),
         .got_null(got_null),
         .got_TimeCode(got_timecode),
-        .got_N_Char(got_nchar),
-        .got_Cred(got_Cred),
+        .got_N_Char(got_data),
         .rx_Error(rx_Error),
 
         // TX
@@ -163,11 +166,11 @@ module codec #(
     );
 
     logic [9:0] wr_data_fifo_sync, rd_data_fifo_sync;
-    logic wr_en_fifo_sync, wr_full_fifo_sync, rd_en_fifo_sync, rd_empty_fifo_sync;
+    logic wr_en_fifo_sync, rd_en_fifo_sync, rd_empty_fifo_sync;
     logic got_bit_clk_ref_tx, parity_err_clk_ref_tx, escape_err_clk_ref_tx;
 
     rx u_rx (
-        .ref_rx_clk(clk_ref_tx),
+        .clk(clk_ref_tx),
         .rst_n(rst_n_rx),
         .D_in(D_in),
         .S_in(S_in),
@@ -209,7 +212,7 @@ module codec #(
     assign wrst_n_sync = wrst_n_sync_ff[1];
 
     fifo1 #(.DSIZE(DSIZE), .ASIZE(ASIZE)) u_fifo_sync_rx(  
-        .wfull(wr_full_fifo_sync),
+        .wfull(), // TODO esse sinal precisa existir? 
         .rempty(rd_empty_fifo_sync),
         .wdata(wr_data_fifo_sync),
         .winc(wr_en_fifo_sync), 

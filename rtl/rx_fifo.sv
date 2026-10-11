@@ -1,5 +1,5 @@
 module rx_fifo #(
-    parameter int DEPTH      = 32,  // Tem que ser 2^(x>=3) mult de 8
+    parameter int DEPTH = 32,  // Tem que ser 2^(x>=3) mult de 8
     parameter int DATA_WIDTH = 9
 ) (
     input logic wr_clk_i,

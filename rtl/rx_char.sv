@@ -38,8 +38,8 @@ module rx_char (
     assign bit_s = bi_s2; // valor estável no ciclo do pulso
 
     //reconstrução do frame
-    logic [7:0] bits_even;
-    logic [7:0] bits_odd;
+    logic [6:0] bits_even;
+    logic [6:0] bits_odd;
 
     logic [11:0] rx_data;
     assign rx_data  = {bits_odd[6], bits_even[6], bits_odd[5], bits_even[5], bits_odd[4],  bits_even[4],
@@ -199,7 +199,7 @@ module rx_char (
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            data_o <= 9'h000;
+            data_o <= '0;
             data_valid_o <= 1'b0;
         end else begin
             data_valid_o <= 1'b0;

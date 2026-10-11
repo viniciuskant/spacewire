@@ -158,6 +158,7 @@ module tb_codec #(
 
         $display("sending 8 bytes of data (A -> B) : %x", data_test);
         for (int i = 0; i < 16; i++) begin
+            wait(!full_tx_fifo_A);
             @(negedge clk_system);
             SpW_Packet_TX_A = stim_buf[i];
             SpW_Packet_TX_en_A = 1;
@@ -291,8 +292,9 @@ module tb_codec #(
 
     task automatic send_packet_A(input [8:0] data);
         begin
+            wait(!full_tx_fifo_A);
             @(posedge clk_system);
-            SpW_Packet_TX_A       = data;
+            SpW_Packet_TX_A = data;
             SpW_Packet_TX_en_A = 1;
             Time_Code_TX_valid_A  = 0;
 
@@ -303,8 +305,9 @@ module tb_codec #(
 
     task automatic send_packet_B(input [8:0] data);
         begin
+            wait(!full_tx_fifo_B);
             @(posedge clk_system);
-            SpW_Packet_TX_B       = data;
+            SpW_Packet_TX_B = data;
             SpW_Packet_TX_en_B = 1;
             Time_Code_TX_valid_B  = 0;
 

@@ -11,10 +11,10 @@ module flow_control_rx #(
     output logic send_FCT
 );
 
-    localparam logic [6:0] MAX_CREDITS = 56;
-    localparam logic [6:0] FCT_GRANT   = 8;
+    localparam logic [$clog2(DEPTH_FIFO)-1:0] MAX_CREDITS = 56;
+    localparam logic [$clog2(DEPTH_FIFO)-1:0] FCT_GRANT   = 8;
 
-    logic [6:0] credits;
+    logic [$clog2(DEPTH_FIFO)-1:0] credits;
 
     assign send_FCT = run_state && (credits <= MAX_CREDITS - FCT_GRANT)
                                  && (free_slots_fifo >= FCT_GRANT);

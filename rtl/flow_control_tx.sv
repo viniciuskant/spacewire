@@ -3,7 +3,7 @@ module flow_control_tx (
     input logic rst_n,
 
     input logic run_state,
-    input logic en_out_fifo_tx, // se alto mandou um dado
+    input logic en_out_fifo_tx, //se alto mandou um dado
     input logic got_FCT_rx,
 
     output logic sending_allowed
@@ -20,8 +20,7 @@ module flow_control_tx (
         end else if (!run_state) begin
             credits <= '0;
         end else begin
-            unique case ({got_FCT_rx && (credits <= MAX_CREDITS - FCT_GRANT),
-                          en_out_fifo_tx})
+            unique case ({got_FCT_rx && (credits <= MAX_CREDITS - FCT_GRANT), en_out_fifo_tx})
                 2'b10: credits <= credits + FCT_GRANT;
                 2'b01: credits <= credits - 1;
                 2'b11: credits <= credits + FCT_GRANT - 1;

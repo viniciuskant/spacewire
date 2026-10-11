@@ -36,7 +36,7 @@ module tx_char (
     part2_t part2_pending, part2_pending_n;
 
     logic       cur_flag,  cur_flag_n;
-    logic [8:0] payload_sh, payload_sh_n;   // shift-register do payload (bit 0 = proximo a sair)
+    logic [7:0] payload_sh, payload_sh_n;   // shift-register do payload (bit 0 = proximo a sair)
     logic [3:0] bit_cnt,   bit_cnt_n;       // bits do payload faltantes
     logic [7:0] tc_latch,  tc_latch_n;      // valor do time-code
 
@@ -89,7 +89,7 @@ module tx_char (
                     end
                     else if (send_data_i) begin
                         cur_flag_n      = data_i[8]; // dado
-                        payload_sh_n    = data_i; // LSB primeiro (Guia, p.53)
+                        payload_sh_n    = data_i[7:0]; // LSB primeiro (Guia, p.53)
                         bit_cnt_n       = (data_i[8] == 1)? 4'd2 : 4'd8;
                         part2_pending_n = PART2_NONE;
                         state_n         = ST_PARITY;
@@ -187,7 +187,7 @@ module tx_char (
             state         <= ST_IDLE;
             part2_pending <= PART2_NONE;
             cur_flag      <= 1'b0;
-            payload_sh    <= 9'b0;
+            payload_sh    <= 8'b0;
             bit_cnt       <= 4'b0;
             tc_latch      <= 8'b0;
             last_char_xor <= 1'b0;   // assume caractere "virtual" anterior com payload 0
