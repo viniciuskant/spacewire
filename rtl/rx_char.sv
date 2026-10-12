@@ -24,7 +24,11 @@ module rx_char (
     // output logic rx_err_level_o, // RxErr em nivel
 
     output logic parity_err_o,
-    output logic escape_err_o
+    output logic escape_err_o,
+
+    // Escrita na rx_fifo (payload de 9 bits: {ctrl, dado[7:0]})
+    output logic       fifo_wr_en_o,
+    output logic [8:0] fifo_wr_data_o
 );
 
     // Codigos de controle: 2 bits
@@ -32,6 +36,9 @@ module rx_char (
     localparam logic [1:0] CODE_EOP = 2'b01;
     localparam logic [1:0] CODE_EEP = 2'b10;
     localparam logic [1:0] CODE_ESC = 2'b11;
+
+    localparam logic [8:0] WORD_EOP = 9'h102;
+    localparam logic [8:0] WORD_EEP = 9'h101;
 
     localparam logic [6:0] NULL_SYNC_PATTERN = 7'b1110100;
 
@@ -87,7 +94,7 @@ module rx_char (
         unique case (state)
             ST_HUNT_NULL: begin
                 if (bit_valid_i) begin
-                    hunt_sh_n = {hunt_sh, bit_i} & 6'h3F; // descarta o bit mais antigo (Icarus ficava avisando)
+                    hunt_sh_n = {hunt_sh[4:0], bit_i}; // icarus fix
                     if ({hunt_sh, bit_i} == NULL_SYNC_PATTERN) begin
                         esc_pending_n     = 1'b1;
                         ctrl_code_n       = CODE_FCT;
@@ -125,7 +132,7 @@ module rx_char (
                         else                 ctrl_code_n[0] = bit_i;
                     end else begin
                         // dado, 8 bits: LSB primeiro = direta
-                        data_acc_n[bit_idx] = bit_i;
+                        data_acc_n[bit_idx] = bit_i; //TODO verificar a lógica, mas talvez bit_idx possar ser de 3 bits
                     end
 
                     if (bit_idx == bit_cnt - 4'd1)
@@ -251,6 +258,11 @@ module rx_char (
             escape_err_o    <= escape_err_n;
         end
     end
+
+    // Escrita na rx_fifo
+    assign fifo_wr_en_o   = got_nchar_o;
+    assign fifo_wr_data_o = got_eop_o ? WORD_EOP :
+                            got_eep_o ? WORD_EEP : {1'b0, data_o};
 
     // RxErr em high
     // logic rx_err_sticky_q;
