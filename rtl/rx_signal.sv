@@ -13,7 +13,6 @@ module rx_signal (
     logic D_meta, S_meta;
     logic D_sync, S_sync; // estável
 
-    // TODO acho que não é para ser problema, pois o clk recuperado tem que ser um múltiplo do clk
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             D_meta <= 1'b0;

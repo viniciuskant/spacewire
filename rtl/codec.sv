@@ -56,7 +56,7 @@ module codec #(
 
     rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_rx_fifo (
         .wr_clk_i(clk_system),
-        .rd_clk_i(clk_system), //TODO verificar se o clock da fifo é o clock do systema
+        .rd_clk_i(clk_system), //TODO verificar se o clock da fifo é o clock do sistema
         .rst_n(rst_n),
 
         .wr_data_i(wr_data_fifo_rx),
@@ -88,9 +88,7 @@ module codec #(
 
     // Módulo para lisar com os erros, colocando EEP no final e esvaziando até o EOP
     // TODO verificar se isso pode dar conflito se o EOP estiver muito longo
-    // TODO arrumar a questão de regiões de clk, pois alguns sinais estão em clk_system e 
-    // outros em clk_tx
-    // TODO falta fazer um teste para analisar esse esse mecânismo está seguindo a especificação 
+
     error_cleanup_fsm u_error_cleanup_fsm (
         .clk_system (clk_system),
         .clk_tx (clk_tx),
@@ -115,9 +113,11 @@ module codec #(
     logic send_fct, send_fct_fc, send_fct_sm;
     assign send_fct = send_fct_fc | send_fct_sm;
 
+    logic rst_n_rx, rst_n_tx;
+
     flow_control #(.DEPTH_FIFO(DEPTH_FIFO)) u_fc(
         .clk(clk_system),
-        .rst_n(rst_n), // TODO falta arrumar aqui para ele funcionar com o rst da máquina de estado quadno rst o tx eo rx
+        .rst_n(rst_n & rst_n_rx & rst_n_tx), // TODO falta arrumar aqui para ele funcionar com o rst da máquina de estado quadno rst o tx eo rx
         .run_state(run_state),
         .en_out_fifo_tx(!empty_tx_fifo_temp & rd_data_fifo_tx),
         .got_FCT_rx(got_fct),
@@ -133,8 +133,7 @@ module codec #(
 
     logic en_rx; // TODO analisar depois se os módulos possuem um sinal para ativar
     logic en_tx; // TODO analisar depois se os módulos possuem um sinal para ativar
-    logic rst_n_rx, rst_n_tx;
-    logic send_null, send_eep, send_eop;
+    logic send_null;
     logic disconnect, start_link;
     assign start_link = 1; // TODO verificar o que seria essa start_link, mas creio
                            // que seja um sinal externo para controle de quandoa ativar o rx
@@ -158,8 +157,6 @@ module codec #(
         .rst_n_tx(rst_n_tx),
         .send_FCT(send_fct_sm),
         .send_Null(send_null),
-        .send_EOP(send_eop),
-        .send_EEP(send_eep),
 
         // FSM
         .disconnect(disconnect),
@@ -204,7 +201,10 @@ module codec #(
     logic [1:0] wrst_n_sync_ff;
     logic  wrst_n_sync;
 
-    always_ff @(posedge clk_ref_tx or negedge rst_n) begin // TODO mudar para pegar o sinal de rst do rx
+    logic rst_n_rx_final;
+    assign rst_n_rx_final = rst_n & rst_n_rx;
+
+    always_ff @(posedge clk_ref_tx or negedge rst_n_rx_final) begin
         if (!rst_n)
             wrst_n_sync_ff <= 2'b00;
         else
@@ -223,7 +223,7 @@ module codec #(
         .rdata(rd_data_fifo_sync),
         .rinc(rd_en_fifo_sync),
         .rclk(clk_system),
-        .rrst_n(rst_n) // posso passar direto, pois se trata do clk do sistema
+        .rrst_n(rst_n)
     );
 
     localparam int unsigned DISCONNECT_TIMEOUT_CYCLES =
@@ -301,8 +301,6 @@ module codec #(
         .run_state(run_state),
         .bit_tick_i(1), // TODO perguntar o que seria isso
         .send_fct_i(send_fct),
-        .send_eop_i(send_eop),
-        .send_eep_i(send_eep),
         .send_null_i(send_null),
         .send_timecode_i(Time_Code_TX_valid),
         .timecode_i(Time_Code_TX)

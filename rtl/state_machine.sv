@@ -3,7 +3,6 @@ module state_machine #(
 )(
     input logic clk,
     input logic rst_n,
-    // TODO ver se seria necessário receber o clk do rx para sincronizar alguns sinais
 
     // RX
     output logic en_rx,
@@ -20,8 +19,6 @@ module state_machine #(
     output logic rst_n_tx,
     output logic send_FCT,
     output logic send_Null,
-    output logic send_EOP,
-    output logic send_EEP,
 
     // FSM
     input logic disconnect,
@@ -32,11 +29,6 @@ module state_machine #(
     // TODO: por hora vou deixar assim
     logic auto_start;
     assign auto_start = 1'b1;
-
-    // TODO 3.6 Link error Recovery:
-    // faltou a parte de send_eop e eep
-    assign send_EEP = 0;
-    assign send_EOP = 0;
 
     //temporizador
     logic timer_en;

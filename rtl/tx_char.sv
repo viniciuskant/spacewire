@@ -11,8 +11,6 @@ module tx_char (
     output logic busy_o,
 
     input logic send_fct_i,
-    input logic send_eop_i,
-    input logic send_eep_i,
     input logic send_null_i,
     input logic send_timecode_i,
     input logic [7:0] timecode_i,
@@ -86,20 +84,6 @@ module tx_char (
                         cur_flag_n      = data_i[8]; // dado
                         payload_sh_n    = data_i[7:0]; // LSB primeiro (Guia, p.53)
                         bit_cnt_n       = (data_i[8] == 1)? 4'd2 : 4'd8;
-                        part2_pending_n = PART2_NONE;
-                        state_n         = ST_PARITY;
-                    end
-                    else if (send_eop_i) begin
-                        cur_flag_n      = 1'b1;
-                        payload_sh_n    = PAYLOAD_EOP;
-                        bit_cnt_n       = 4'd2;
-                        part2_pending_n = PART2_NONE;
-                        state_n         = ST_PARITY;
-                    end
-                    else if (send_eep_i) begin
-                        cur_flag_n      = 1'b1;
-                        payload_sh_n    = PAYLOAD_EEP;
-                        bit_cnt_n       = 4'd2;
                         part2_pending_n = PART2_NONE;
                         state_n         = ST_PARITY;
                     end

@@ -13,8 +13,6 @@ module tx(
     input logic run_state,
     input logic bit_tick_i,
     input logic send_fct_i,
-    input logic send_eop_i,
-    input logic send_eep_i,
     input logic send_null_i,
     output logic char_ack_o,
 
@@ -102,8 +100,6 @@ module tx(
         .data_i(data_reg),
         .busy_o(busy_char),
         .send_fct_i(send_fct_i),
-        .send_eop_i(send_eop_i),
-        .send_eep_i(send_eep_i),
         .send_null_i(send_null_i),
         .send_timecode_i(~tc_fifo_rempty),
         .timecode_i(tc_fifo_rdata),
