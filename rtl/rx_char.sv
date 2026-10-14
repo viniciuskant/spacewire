@@ -60,15 +60,8 @@ module rx_char (
         if (!rx_flag) begin // data char: 10 bits
             if (bit_idx == 4'h9) last_bit = 1'b1;
         end else begin
-            if (bit_idx == 4'h3) begin // FCT/EOP/EEP (4 bits) x ESC (continua)
-                if ({bit_s, rx_data[0]} != 2'b11)
-                    last_bit = 1'b1;
-            end else if (bit_idx == 4'h7) begin // NULL (8 bits): frame bit 4 == 0
-                if (rx_data[2] == 1'b0)
-                    last_bit = 1'b1;
-            end else if (bit_idx == 4'hD) begin // Timecode (14 bits): frame bit 4 == 1
-                if (rx_data[2] == 1'b1)
-                    last_bit = 1'b1;
+            if (bit_idx == 4'h3) begin // FCT/EOP/EEP/ESC
+                last_bit = 1'b1;
             end
         end
     end
@@ -104,12 +97,13 @@ module rx_char (
         else done_i <= bit_pulse & last_bit;
     end
 
-    logic got_eop, got_eep, got_timecode, got_data, got_fct, got_null;
+    logic got_eop, got_eep, got_esc, got_timecode, got_data, got_fct, got_null;
     logic parity_calc;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             got_fct <= 1'b0;
+            got_esc <= 1'b0;
             got_eop <= 1'b0;
             got_eep <= 1'b0;
             got_null <= 1'b0;
@@ -119,6 +113,7 @@ module rx_char (
         end else begin
             got_fct <= 1'b0;
             got_eop <= 1'b0;
+            got_esc <= 1'b0;
             got_eep <= 1'b0;
             got_null <= 1'b0;
             got_timecode <= 1'b0;
@@ -126,12 +121,14 @@ module rx_char (
 
             if (bit_pulse & last_bit) begin // se terminou o frame
                 if (!rx_flag) begin
-                    got_data <= 1'b1;
+                    got_timecode <= (prev_is_esc) ? 1'b1 : 1'b0;
+                    got_data <= (prev_is_esc) ? 1'b0 : 1'b1;
                     parity_calc <= ^{bit_s, rx_data[6:0]};
                 end else begin
-                    if (bit_idx == 4'h3) begin // FCT/EOP/EEP
+                    if (bit_idx == 4'h3) begin // FCT/EOP/EEP/ESC
                         if ({bit_s, rx_data[0]} == 2'b00) begin
-                            got_fct <= 1'b1;
+                            got_null <= (prev_is_esc) ? 1'b1 : 1'b0;
+                            got_fct <= (prev_is_esc) ? 1'b0 : 1'b1;
                             parity_calc <= bit_s ^ rx_data[0];
                         end else if ({bit_s, rx_data[0]} == 2'b10) begin
                             got_eop <= 1'b1;
@@ -139,41 +136,33 @@ module rx_char (
                         end else if ({bit_s, rx_data[0]} == 2'b01) begin
                             got_eep <= 1'b1;
                             parity_calc <= bit_s ^ rx_data[0];
+                        end else begin
+                            got_esc <= 1'b1;
+                            parity_calc <= bit_s ^ rx_data[0];
                         end
-                    end else if (bit_idx == 4'h7) begin
-                        if (rx_data[2] == 1'b0) begin // NULL
-                            got_null <= 1'b1;
-                            parity_calc <= ^{bit_s, rx_data[4:0]};
-                        end
-                    end else if (bit_idx == 4'hD) begin // Timecode 
-                        if (rx_data[2] == 1'b1) begin
-                            got_timecode <= 1'b1;
-                            parity_calc <= ^{bit_s, rx_data[10:0]};
-                        end
-                    end
+                    end 
                 end
             end
         end
     end
 
+    logic prev_is_esc;
     logic prev_parity_calc;
-    logic prev_parity_calc_valid; // TODO acho que se deve desconsiderar a paridade do primeiro
     logic parity_err_reg;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             parity_err_reg <= 1'b0;
             prev_parity_calc <= 1'b0;
-            prev_parity_calc_valid <= 1'b0;
-        end else if (bit_pulse && bit_idx == 4'h1) begin
-            if (parity_err_reg)
+            prev_is_esc <= 1'b0;
+        end else begin
+            if (parity_err_reg) begin
                 parity_err_reg <= 1'b1; // trava o erro
-            else if (!prev_parity_calc_valid) begin
-                parity_err_reg <= 1'b0;
+            end else if (bit_pulse && bit_idx == 4'h1) begin
+                parity_err_reg <= (rx_parity ^ bit_s ^ prev_parity_calc) != 1'b1;
             end else if (done_i) begin
-                parity_err_reg <= (rx_parity ^ prev_parity_calc) == 1'b0;
+                prev_is_esc <= got_esc;
                 prev_parity_calc <= parity_calc;
-                prev_parity_calc_valid <= 1'b1;
             end
         end
     end
@@ -185,13 +174,12 @@ module rx_char (
             escape_err_o <= 1'b0;
         else if (escape_err_o)
             escape_err_o <= 1'b1; // trava o erro
-        else if (got_null)
-            // frame bits 7:6 = rx_data[5:4]
-            escape_err_o <= (rx_data[5:4] != 2'b00);
+        else if (prev_is_esc && (got_eep | got_eop | got_esc))
+            escape_err_o <= 1'b1;
     end
 
  
-    // codificação interna (últimos 3 bits da saída)
+    // codificação interna (últimos 2 bits da saída)
     //      2'b00 Data Characters
     //      2'b01 Control Characters
     //      2'b10 NULL
@@ -214,7 +202,7 @@ module rx_char (
                     data_o <= {8'd0, 2'b10};
                     data_valid_o <= 1'b1;
                 end else if (got_timecode) begin //timecode
-                    data_o <= {rx_data[11:4], 2'b11};
+                    data_o <= {rx_data[7:0], 2'b11};
                     data_valid_o <= 1'b1;
                 end
             end

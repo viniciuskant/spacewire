@@ -37,7 +37,7 @@ module tb_rx_char;
     logic escape_err_o;
 
     rx_char dut (
-        .ref_rx_clk (ref_rx_clk),
+        .clk (ref_rx_clk),
         .rst_n (rst_n),
         .bit_valid_i (bit_valid_i),
         .bit_i (bit_i),
@@ -66,49 +66,49 @@ module tb_rx_char;
 
     // converte um char_t em sequência de bits (inclui paridade)
     // P = ~(data ^ F_next)
-    function automatic int encode_char(input logic [2:0] t, input logic [7:0] payload, input logic next_flag, output logic [15:0] bits);
+    function automatic int encode_char(input logic [2:0] t, input logic [7:0] payload, input logic prev_calc_parity, output logic [15:0] bits, input int idx);
         logic p;
         bits = '0;
 
         case (t)
             // DATA : [P F D0..D7] (10 bits)
             CH_DATA: begin
-                p = ~(1'b0 ^ (^payload) ^ next_flag);
+                p = (idx == 0) ? 0 : ~(0 ^ prev_calc_parity);
                 bits[9:0] = {payload, 1'b0, p};
                 return 10;
             end
 
             // FCT: [P F 0 0] (4 bits)
             CH_FCT: begin
-                p = ~((^3'b001) ^ next_flag);
+                p = (idx == 0) ? 0 : ~(1 ^ prev_calc_parity);
                 bits[3:0] = {3'b001, p};
                 return 4;
             end
 
             // EOP: [P F 1 0] (4 bits)
             CH_EOP: begin
-                p = ~((^3'b101) ^ next_flag);
+                p = (idx == 0) ? 0 : ~(1 ^ prev_calc_parity);
                 bits[3:0] = {3'b101, p};
                 return 4;
             end
 
             // EEP: [P F 0 1] (4 bits)
             CH_EEP: begin
-                p = ~((^3'b011) ^ next_flag);
+                p = (idx == 0) ? 0 : ~(1 ^ prev_calc_parity);
                 bits[3:0] = {3'b011, p};
                 return 4;
             end
 
             // NULL: ESC + FCT (8 bits)
             CH_NULL: begin
-                p = ~((^7'b0010111) ^ next_flag);
+                p = (idx == 0) ? 0 : ~(1 ^ prev_calc_parity);
                 bits[7:0] = {7'b0010111, p};
                 return 8;
             end
 
             // TIMECODE: ESC + 10 bits (14 total)
             CH_TIMECODE: begin
-                p = ~((^payload) ^ (^5'b01111) ^ next_flag);
+                p = (idx == 0) ? 0 : ~(1 ^ prev_calc_parity);
                 bits[13:0] = {payload, 5'b01111, p};
                 return 14;
             end
@@ -121,18 +121,24 @@ module tb_rx_char;
     task automatic build_bit_stream();
         logic [15:0] bits;
         int n;
-        logic next_flag;
+        logic prev_calc_parity;
         bit_count = 0;
+        prev_calc_parity = 0;
         for (int i = 0; i < tx_count; i++) begin
-            if (i + 1 < tx_count)
-                next_flag = (tx_type[i+1] == CH_DATA) ? 1'b0 : 1'b1;
-            else
-                next_flag = 1'b0;
-            n = encode_char(tx_type[i], tx_payload[i], next_flag, bits);
+            n = encode_char(tx_type[i], tx_payload[i], prev_calc_parity, bits, i);
             for (int k = 0; k < n; k++) begin
                 bit_stream[bit_count] = bits[k];
                 bit_count++;
             end
+            prev_calc_parity = ^ tx_payload[i];
+            case (tx_type[i])
+                CH_DATA: prev_calc_parity = ^ tx_payload[i];
+                CH_FCT: prev_calc_parity = ^ 2'b00;
+                CH_EOP: prev_calc_parity = ^ 2'b10;
+                CH_EEP: prev_calc_parity = ^ 2'b01;
+                CH_NULL: prev_calc_parity = ^ 2'b00;
+                CH_TIMECODE: prev_calc_parity = ^ tx_payload[i];
+            endcase
         end
     endtask
 
@@ -224,7 +230,7 @@ module tb_rx_char;
 
         // fila de transmissão
         tx_type[0]  = CH_NULL;     tx_payload[0]  = 8'h00;
-        tx_type[1]  = CH_DATA;     tx_payload[1]  = 8'h11;
+        tx_type[1]  = CH_DATA;     tx_payload[1]  = 8'h00;
         tx_type[2]  = CH_TIMECODE; tx_payload[2]  = 8'h22;
         tx_type[3]  = CH_DATA;     tx_payload[3]  = 8'h5A;
         tx_type[4]  = CH_DATA;     tx_payload[4]  = 8'hAA;
@@ -306,10 +312,12 @@ module tb_rx_char;
     end
 
     always @(posedge parity_err_o) begin
+        #500;
         $error("[%0t] *** FAIL: PARITY ERROR ***", $time);
     end
 
     always @(posedge escape_err_o) begin
+        #500;
         $error("[%0t] *** FAIL: ESCAPE ERROR ***", $time);
     end
 

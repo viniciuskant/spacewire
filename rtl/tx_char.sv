@@ -17,8 +17,6 @@ module tx_char (
     input logic send_timecode_i,
     input logic [7:0] timecode_i,
 
-    output logic char_ack_o,
-
     // Interface com tx_signal
     output logic bit_valid_o,
     output logic bit_o
@@ -43,12 +41,11 @@ module tx_char (
     logic       last_char_xor, last_char_xor_n; // XOR{payload} do ultimo caractere completo (sem o flag)
     logic       xor_acc, xor_acc_n;             // acumulador do payload do caractere em andamento
 
-    logic char_ack_n;
     logic bit_valid_n, bit_n;
-    logic busy_n;
 
     logic idle_settled, idle_settled_n;
 
+    assign busy_o = (state != ST_IDLE);
     //logica combinacional:
     always_comb begin
         // defaults
@@ -60,17 +57,15 @@ module tx_char (
         tc_latch_n      = tc_latch;
         last_char_xor_n = last_char_xor;
         xor_acc_n       = xor_acc;
-        char_ack_n      = 1'b0;
         bit_valid_n     = 1'b0;
         bit_n           = 1'b0;
         idle_settled_n  = (state == ST_IDLE);
-        busy_n = 1;
+        
         unique case (state)
 
             ST_IDLE: begin
 
                 if (idle_settled) begin
-                    busy_n = 0;
                     // Arbitragem de prioridade fixa (Guia, p.56)
                     if (send_timecode_i) begin
                         cur_flag_n      = 1'b1; // ESC e caractere de controle
@@ -152,7 +147,6 @@ module tx_char (
 
                         unique case (part2_pending)
                             PART2_NONE: begin
-                                char_ack_n      = 1'b1;
                                 state_n         = ST_IDLE;
                             end
                             PART2_NULL_FCT: begin
@@ -192,11 +186,9 @@ module tx_char (
             tc_latch      <= 8'b0;
             last_char_xor <= 1'b0;   // assume caractere "virtual" anterior com payload 0
             xor_acc       <= 1'b0;
-            char_ack_o    <= 1'b0;
             bit_valid_o   <= 1'b0;
             bit_o         <= 1'b0;
             idle_settled  <= 1'b0;
-            busy_o <= 0;
         end else begin
             state         <= state_n;
             part2_pending <= part2_pending_n;
@@ -206,11 +198,9 @@ module tx_char (
             tc_latch      <= tc_latch_n;
             last_char_xor <= last_char_xor_n;
             xor_acc       <= xor_acc_n;
-            char_ack_o    <= char_ack_n;
             bit_valid_o   <= bit_valid_n;
             bit_o         <= bit_n;
             idle_settled  <= idle_settled_n;
-            busy_o <= busy_n;
         end
     end
 

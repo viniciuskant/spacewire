@@ -156,7 +156,7 @@ module state_machine #(
     end
 
     // saídas
-    always_comb begin
+        always_comb begin
         en_rx = 1'b0;
         rst_n_rx = 1'b1;
         en_tx = 1'b0;
@@ -197,10 +197,11 @@ module state_machine #(
             RUN: begin
                 en_tx = 1'b1;
                 send_FCT = 1'b0;
-                send_Null = 1'b0;
+                send_Null = 1'b1;
                 en_rx = 1'b1;
                 run_state = 1'b1;
             end
+
             default: begin
                 en_rx = 1'b0;
                 rst_n_rx = 1'b1;

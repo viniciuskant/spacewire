@@ -1,5 +1,5 @@
 module codec #(
-    parameter int DEPTH_FIFO = 512,
+    parameter int DEPTH_FIFO = 64,
     parameter int DATA_WIDTH_FIFO = 9,
     parameter int CLK_FREQ = 10_000_000,
     parameter int SYS_CLK_FREQ_HZ = 50_000_000,
@@ -51,7 +51,7 @@ module codec #(
     logic wr_en_fifo_rx, rd_en_fifo_tx, rd_en_fifo_tx_temp, empty_tx_fifo, empty_tx_fifo_temp;
 
     logic credit_err;
-    logic [$clog2(DEPTH_FIFO+1)-1:0] free_slots_fifo_rx;
+    logic [$clog2(DEPTH_FIFO+1)-1:0] free_slots_fifo_rx, free_slots_fifo_tx;
 
 
     rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_rx_fifo (
@@ -70,18 +70,20 @@ module codec #(
     );
 
     assign credit_err = (free_slots_fifo_rx == '0) & wr_en_fifo_rx;
+    assign full_tx_fifo = free_slots_fifo_tx == '0;
 
-    tx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_tx_fifo (
-        .clk(clk_tx),
-        .rst_n(rst_n),
+    rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_tx_fifo (
+        .wr_clk_i(clk_system),
+        .rd_clk_i(clk_tx),
+        .rst_n(rst_n), // TODO ver a questão de cdc
 
         .wr_data_i(SpW_Packet_TX),
         .wr_en_i(SpW_Packet_TX_en),
-        .full_o(full_tx_fifo),
 
-        .rd_data_o(rd_data_fifo_tx_temp),
         .rd_en_i(rd_en_fifo_tx_temp),
-        .empty_o(empty_tx_fifo_temp)
+        .rd_data_o(rd_data_fifo_tx_temp),
+        .empty_o(empty_tx_fifo_temp),
+        .free_space_o(free_slots_fifo_tx)
     );
 
     // Módulo para lisar com os erros, colocando EEP no final e esvaziando até o EOP
@@ -90,7 +92,8 @@ module codec #(
     // outros em clk_tx
     // TODO falta fazer um teste para analisar esse esse mecânismo está seguindo a especificação 
     error_cleanup_fsm u_error_cleanup_fsm (
-        .clk (clk_system),
+        .clk_system (clk_system),
+        .clk_tx (clk_tx),
         .rst_n (rst_n),
         .run_state (run_state),
         .rx_Error (rx_Error),
@@ -105,7 +108,6 @@ module codec #(
     );
 
     logic run_state;
-
     logic got_data, got_fct, got_eop, got_eep, got_null, got_timecode;
 
     logic [7:0] payload;
@@ -202,7 +204,7 @@ module codec #(
     logic [1:0] wrst_n_sync_ff;
     logic  wrst_n_sync;
 
-    always_ff @(posedge clk_ref_tx or negedge rst_n) begin
+    always_ff @(posedge clk_ref_tx or negedge rst_n) begin // TODO mudar para pegar o sinal de rst do rx
         if (!rst_n)
             wrst_n_sync_ff <= 2'b00;
         else
@@ -212,7 +214,7 @@ module codec #(
     assign wrst_n_sync = wrst_n_sync_ff[1];
 
     fifo1 #(.DSIZE(DSIZE), .ASIZE(ASIZE)) u_fifo_sync_rx(  
-        .wfull(), // TODO esse sinal precisa existir? 
+        .wfull(), // TODO colocar isso no teste, se der alto sinalizar erro
         .rempty(rd_empty_fifo_sync),
         .wdata(wr_data_fifo_sync),
         .winc(wr_en_fifo_sync), 
@@ -234,15 +236,22 @@ module codec #(
     always_ff @(posedge clk_system or negedge rst_n) begin
         if (!rst_n) begin
             disconnect_cnt <= '0;
+            disconnect     <= 1'b0;
+        end
+        else if (!run_state) begin
+            disconnect_cnt <= '0;
+            disconnect     <= 1'b0;
+        end
+        else begin
             disconnect <= 1'b0;
-        end else begin
-            disconnect <= 1'b0;
-            if (!rd_empty_fifo_sync) begin
+            if (got_bit) begin
                 disconnect_cnt <= '0;
-            end else if ((disconnect_cnt == (DISCONNECT_TIMEOUT_CYCLES - 1))) begin
-                disconnect <= 1'b1;
+            end
+            else if (disconnect_cnt == (DISCONNECT_TIMEOUT_CYCLES - 1)) begin
+                disconnect     <= 1'b1;
                 disconnect_cnt <= '0;
-            end else begin
+            end
+            else begin
                 disconnect_cnt <= disconnect_cnt + 1'b1;
             end
         end
@@ -279,10 +288,10 @@ module codec #(
     end
 
     logic bit_tick; //TODO falta conectar
-    logic char_ack_o; //TODO falta conectar
 
     tx u_tx(
-        .clk(clk_tx),
+        .clk_tx(clk_tx),
+        .clk_system(clk_system),
         .rst_n(rst_n_tx),
         .D_out(D_out),
         .S_out(S_out),
@@ -295,7 +304,6 @@ module codec #(
         .send_eop_i(send_eop),
         .send_eep_i(send_eep),
         .send_null_i(send_null),
-        .char_ack_o(char_ack_o), // TODO perguntar o que seria isso
         .send_timecode_i(Time_Code_TX_valid),
         .timecode_i(Time_Code_TX)
     );

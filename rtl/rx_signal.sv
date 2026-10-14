@@ -28,7 +28,6 @@ module rx_signal (
         end
     end
 
-
     logic xor_prev; // valor anterior de (D_sync ^ S_sync)
     logic xor_now; // valor atual
 

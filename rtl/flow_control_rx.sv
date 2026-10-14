@@ -1,7 +1,7 @@
 module flow_control_rx #(
     parameter DEPTH_FIFO = 2048
 )(
-    input logic clk,
+    input logic clk, // 50MHz
     input logic rst_n,
 
     input logic run_state,
