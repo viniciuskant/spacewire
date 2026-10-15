@@ -1,59 +1,51 @@
-module rx_signal #(
-    parameter int SYS_CLK_FREQ_HZ      = 50_000_000,
-    parameter int DISCONNECT_TIMEOUT_NS = 850
-) (
-    input  logic clk,
-    input  logic rst_n,
+module rx_signal (
+    input logic clk, // clock de amostragem 200 MHz
+    input logic rst_n,
 
-    // Linhas D/S ja sincronizadas (Ver como sincronizar clock na chegada dps)
-    input  logic d_i,
-    input  logic s_i,
+    input logic D_in,
+    input logic S_in,
 
     output logic bit_valid_o,
-    output logic bit_o,
-    output logic disconnect_o
+    output logic bit_o
 );
 
-    // multiplicacao em longint(64b): (850 ns * 50 MHz = 42.5e9)
-    localparam int unsigned DISCONNECT_TIMEOUT_CYCLES =
-        int'((longint'(DISCONNECT_TIMEOUT_NS) * longint'(SYS_CLK_FREQ_HZ)) / 1_000_000_000);
-
-    localparam int CNT_WIDTH = $clog2(DISCONNECT_TIMEOUT_CYCLES + 1);
-
-    logic                  xor_prev;
-    logic                  first_bit_seen; 
-    logic [CNT_WIDTH-1:0]  disconnect_cnt;
-
-    wire xor_now        = d_i ^ s_i;
-    wire edge_detected  = (xor_now != xor_prev);
+    // sincronização das entradas no domínio de clk, evitar instabilidade
+    logic D_meta, S_meta;
+    logic D_sync, S_sync; // estável
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            xor_prev       <= 1'b0;
-            first_bit_seen <= 1'b0;
-            disconnect_cnt <= '0;
-            bit_valid_o    <= 1'b0;
-            bit_o          <= 1'b0;
-            disconnect_o   <= 1'b0;
+            D_meta <= 1'b0;
+            S_meta <= 1'b0;
+            D_sync <= 1'b0;
+            S_sync <= 1'b0;
         end else begin
-            xor_prev     <= xor_now;
-            bit_valid_o  <= 1'b0;
-            disconnect_o <= 1'b0;
+            D_meta <= D_in;
+            S_meta <= S_in;
+            D_sync <= D_meta;
+            S_sync <= S_meta;
+        end
+    end
 
-            if (edge_detected) begin
-                bit_o          <= d_i;
-                bit_valid_o    <= 1'b1;
-                first_bit_seen <= 1'b1;
-                disconnect_cnt <= '0;
-            end else if (first_bit_seen) begin
-                if (disconnect_cnt == (DISCONNECT_TIMEOUT_CYCLES - 1)) begin
-                    disconnect_o   <= 1'b1;
-                    disconnect_cnt <= '0; // reset contagem 
-                end else begin
-                    disconnect_cnt <= disconnect_cnt + 1'b1;
-                end
+    logic xor_prev; // valor anterior de (D_sync ^ S_sync)
+    logic xor_now; // valor atual
+
+    assign xor_now = D_sync ^ S_sync;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            xor_prev <= 1'b0;
+            bit_valid_o <= 1'b0;
+            bit_o <= 1'b0;
+        end else begin
+            xor_prev <= xor_now;
+
+            if (xor_now != xor_prev) begin // transição detectada
+                bit_valid_o <= 1'b1;
+                bit_o <= D_sync; // captura o data no instante da transição
+            end else begin
+                bit_valid_o <= 1'b0;
             end
-            // antes do 1o bit pos-reset o contador de desconexao fica parado
         end
     end
 

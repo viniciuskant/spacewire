@@ -11,7 +11,7 @@ module flow_control #(
     output logic sending_allowed,
 
     input logic en_in_fifo_rx,
-    input logic [$clog2(DEPTH_FIFO_RX)-1:0] free_slots_fifo_rx,
+    input logic [$clog2(DEPTH_FIFO)-1:0] free_slots_fifo_rx,
     output logic send_FCT
 );
 

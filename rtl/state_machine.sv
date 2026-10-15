@@ -1,29 +1,27 @@
 module state_machine #(
-    parameter CLK_FREQ = 10_000_000
+    parameter int CLK_FREQ = 10_000_000
 )(
     input logic clk,
     input logic rst_n,
 
     // RX
     output logic en_rx,
-    output logic rst_rx,
+    output logic rst_n_rx,
     input logic got_bit,
     input logic got_FCT,
     input logic got_null,
     input logic got_TimeCode,
     input logic got_N_Char,
-    input logic got_Cred,
     input logic rx_Error,
 
     // TX
     output logic en_tx,
-    output logic rst_tx,
+    output logic rst_n_tx,
     output logic send_FCT,
     output logic send_Null,
-    output logic send_NChar,
 
     // FSM
-    input logic link_disabled,
+    input logic disconnect,
     input logic start_link,
     output logic run_state
 );
@@ -106,7 +104,7 @@ module state_machine #(
                 if (rx_Error | got_FCT | got_N_Char | got_TimeCode) begin
                     next_state = ERRO_RESET;
                     timer_clear = 1'b1;
-                end else if (!link_disabled && (start_link || (auto_start && got_bit))) begin
+                end else if (!disconnect && (start_link || (auto_start && got_bit))) begin
                     next_state = STARTED;
                     timer_clear = 1'b1;
                 end
@@ -136,8 +134,8 @@ module state_machine #(
 
             RUN: begin
                 //no 4link, usa diferente, usa isso:
-                // if ((! (!link_disabled && (start_link || (auto_start and got_bit))) )|| rx_Error) begin
-                if (link_disabled || rx_Error) begin
+                // if ((! (!disconnect && (start_link || (auto_start and got_bit))) )|| rx_Error) begin
+                if (disconnect || rx_Error) begin
                     next_state = ERRO_RESET;
                     timer_clear = 1'b1;
                 end
@@ -150,29 +148,28 @@ module state_machine #(
     end
 
     // saídas
-    always_comb begin
+        always_comb begin
         en_rx = 1'b0;
-        rst_rx = 1'b0;
+        rst_n_rx = 1'b1;
         en_tx = 1'b0;
-        rst_tx = 1'b0;
+        rst_n_tx = 1'b1;
         send_FCT = 1'b0;
         send_Null = 1'b0;
-        send_NChar = 1'b0;
         run_state = 1'b0;
 
         case (current_state)
             ERRO_RESET: begin
-                rst_tx = 1'b1;
-                rst_rx = 1'b1;
+                rst_n_tx = 1'b0;
+                rst_n_rx = 1'b0;
             end
 
             ERRO_WAIT: begin
-                rst_tx = 1'b1;
+                rst_n_tx = 1'b0;
                 en_rx = 1'b1;
             end
 
             READY: begin
-                rst_tx = 1'b1;
+                rst_n_tx = 1'b0;
                 en_rx = 1'b1;
             end
 
@@ -191,11 +188,20 @@ module state_machine #(
 
             RUN: begin
                 en_tx = 1'b1;
-                send_FCT = 1'b1;
-                send_NChar = 1'b1;
+                send_FCT = 1'b0;
                 send_Null = 1'b1;
                 en_rx = 1'b1;
                 run_state = 1'b1;
+            end
+
+            default: begin
+                en_rx = 1'b0;
+                rst_n_rx = 1'b1;
+                en_tx = 1'b0;
+                rst_n_tx = 1'b1;
+                send_FCT = 1'b0;
+                send_Null = 1'b0;
+                run_state = 1'b0;
             end
         endcase
     end
