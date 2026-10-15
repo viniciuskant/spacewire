@@ -29,3 +29,6 @@ result-*
 Guides/
 sim/
 
+
+.tmp/
+*.tmp
