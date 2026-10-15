@@ -1,12 +1,13 @@
 # library dir & path
-set PRJ_ROOT            $PRJ_ROOT_SETUP
-set FLOW_ROOT           $FLOW_ROOT_SETUP
-set IO_LIB_PATH	        $IO_LIB_PATH_SETUP
-set STD_LIB_PATH        $STD_LIB_PATH_SETUP
-set SOURCE_PATH         $FLOW_ROOT/inp_data/source
+set PRJ_ROOT $PRJ_ROOT_SETUP
+set FLOW_ROOT $FLOW_ROOT_SETUP
+set IO_LIB_PATH $IO_LIB_PATH_SETUP
+set STD_LIB_PATH $STD_LIB_PATH_SETUP
+
+set RTL_DIR $::env(RTL_DIR)
 
 # search path for all files
-set_app_var search_path [concat $search_path "." $STD_LIB_PATH $IO_LIB_PATH $SOURCE_PATH]
+set_app_var search_path [concat $search_path "." $STD_LIB_PATH $IO_LIB_PATH $RTL_DIR]
 
 # library settings
 set synthetic_library   "dw_foundation.sldb"
@@ -24,7 +25,7 @@ set_min_library $IO_LIB_PATH/ixc013g2_iocell_slow_1p08V_3p0V_125C.db \
     -min_version $IO_LIB_PATH/ixc013g2_iocell_fast_1p32V_3p6V_m40C.db 
 
 # design setting
-set TOP_MODULE_NAME top_pad_rvx
+set TOP_MODULE_NAME codec
 set DESIGN rvx
 
 #UM: Fix register autoremoval

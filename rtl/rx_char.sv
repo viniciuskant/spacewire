@@ -99,6 +99,7 @@ module rx_char (
 
     logic got_eop, got_eep, got_esc, got_timecode, got_data, got_fct, got_null;
     logic parity_calc;
+    logic prev_is_esc;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -146,7 +147,6 @@ module rx_char (
         end
     end
 
-    logic prev_is_esc;
     logic prev_parity_calc;
     logic parity_err_reg;
 

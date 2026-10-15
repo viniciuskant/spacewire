@@ -38,6 +38,7 @@ module codec #(
 
     logic clk_tx;
     logic [7:0] limit_counter_tx;
+    logic run_state;
     assign limit_counter_tx = run_state ? div_counter_tx : DIV_10MHz;
 
     var_clk_divider u_var_clk_divider (
@@ -88,6 +89,8 @@ module codec #(
 
     // Módulo para lisar com os erros, colocando EEP no final e esvaziando até o EOP
     // TODO verificar se isso pode dar conflito se o EOP estiver muito longo
+    logic rx_Error, parity_err, escape_err;
+    logic disconnect, start_link;
 
     error_cleanup_fsm u_error_cleanup_fsm (
         .clk_system (clk_system),
@@ -105,7 +108,6 @@ module codec #(
         .empty_tx_fifo (empty_tx_fifo)
     );
 
-    logic run_state;
     logic got_data, got_fct, got_eop, got_eep, got_null, got_timecode;
 
     logic [7:0] payload;
@@ -119,7 +121,7 @@ module codec #(
         .clk(clk_system),
         .rst_n(rst_n & rst_n_rx & rst_n_tx), // TODO falta arrumar aqui para ele funcionar com o rst da máquina de estado quadno rst o tx eo rx
         .run_state(run_state),
-        .en_out_fifo_tx(!empty_tx_fifo_temp & rd_data_fifo_tx),
+        .en_out_fifo_tx(!empty_tx_fifo_temp & rd_en_fifo_tx),
         .got_FCT_rx(got_fct),
         .sending_allowed(sending_allowed),
         .en_in_fifo_rx(wr_en_fifo_rx),
@@ -128,13 +130,11 @@ module codec #(
     );
 
     logic got_bit;
-    logic rx_Error, parity_err, escape_err;
     assign rx_Error = escape_err | parity_err;
 
     logic en_rx; // TODO analisar depois se os módulos possuem um sinal para ativar
     logic en_tx; // TODO analisar depois se os módulos possuem um sinal para ativar
     logic send_null;
-    logic disconnect, start_link;
     assign start_link = 1; // TODO verificar o que seria essa start_link, mas creio
                            // que seja um sinal externo para controle de quandoa ativar o rx
 
@@ -205,7 +205,7 @@ module codec #(
     assign rst_n_rx_final = rst_n & rst_n_rx;
 
     always_ff @(posedge clk_ref_tx or negedge rst_n_rx_final) begin
-        if (!rst_n)
+        if (!rst_n_rx_final)
             wrst_n_sync_ff <= 2'b00;
         else
             wrst_n_sync_ff <= {wrst_n_sync_ff[0], 1'b1};
@@ -288,6 +288,7 @@ module codec #(
     end
 
     logic bit_tick; //TODO falta conectar
+    assign bit_tick = 1'b1;
 
     tx u_tx(
         .clk_tx(clk_tx),
@@ -299,7 +300,7 @@ module codec #(
         .rd_data_fifo(rd_data_fifo_tx), 
         .empty_fifo(empty_tx_fifo),
         .run_state(run_state),
-        .bit_tick_i(1), // TODO perguntar o que seria isso
+        .bit_tick_i(bit_tick),
         .send_fct_i(send_fct),
         .send_null_i(send_null),
         .send_timecode_i(Time_Code_TX_valid),

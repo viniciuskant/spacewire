@@ -117,7 +117,7 @@ function run_codec_test {
 function run_fifo_rx2fifo_test {
     echo "Executando teste fifo1"
     verilator --top-module tb_fifo1 \
-        "${RTL_DIR}/fifo_rx2fifo/tests/tb_fifo1.sv" \
+        "${TESTS_DIR}/tb_fifo1.sv" \
         "${RTL_DIR}/fifo_rx2fifo/rtl/fifo1.sv" \
         "${RTL_DIR}/fifo_rx2fifo/rtl/fifomem.sv" \
         "${RTL_DIR}/fifo_rx2fifo/rtl/rptr_empty.sv" \

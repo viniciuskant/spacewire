@@ -4,9 +4,9 @@ set_svf $PRE_LAYOUT_DIR/${DESIGN}.svf
 set_app_var hdlin_enable_hier_map true
 set verilogout_show_unconnected_pins true
 
-# set sv_files [glob -nocomplain -directory $SOURCE_PATH *.sv]
+# set sv_files [glob -nocomplain -directory $RTL_DIR *.sv]
 # if {[llength $sv_files] == 0} {
-#     error "No .sv files found in $SOURCE_PATH"
+#     error "No .sv files found in $RTL_DIR"
 # }
 # puts "=== Analyzing [llength $sv_files] files SystemVerilog"
 
@@ -20,12 +20,12 @@ set verilogout_show_unconnected_pins true
 # uniquify
 
 # Verilog
-set v_files [split [exec find $SOURCE_PATH -name "*.v"] "\n"]
+set v_files [split [exec find $RTL_DIR -name "*.sv"] "\n"]
 
 if {[llength $v_files] > 0} {
-    analyze -format verilog -vcs "+incdir+${SOURCE_PATH}" $v_files
+    analyze -format sverilog -vcs "+incdir+${RTL_DIR}" $v_files
 } else {
-    puts "ERROR: No .v files found in $SOURCE_PATH"
+    puts "ERROR: No .sv files found in $RTL_DIR"
 }
 
 echo $v_files

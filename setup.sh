@@ -1,7 +1,12 @@
 export PROJECT_ROOT=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 
+export RTL_DIR="$PROJECT_ROOT/rtl"
+
 export TOOLS_DIR="$PROJECT_ROOT/tools"
+export SETUP_DIR="$PROJECT_ROOT/tools/setup"
 export SYNTHESIS_DIR="$TOOLS_DIR/2_synthesis"
+export SCRIPTS_DIR="$SYNTHESIS_DIR/scripts"
+
 
 ### MODULES
 MODULES=(

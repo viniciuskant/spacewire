@@ -32,3 +32,5 @@ sim/
 
 .tmp/
 *.tmp
+out_data/
+alib-52/ 

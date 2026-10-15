@@ -57,6 +57,9 @@ module rx_fifo #(
         end
     end
 
+    logic [PTR_WIDTH-1:0] rd_ptr_bin, rd_ptr_gray;
+
+
     always_ff @(posedge wr_clk_i or negedge rst_n) begin
         if (!rst_n) begin
             rd_ptr_gray_wsync1 <= '0;
@@ -73,7 +76,6 @@ module rx_fifo #(
     assign free_space_o = DEPTH - (wr_ptr_bin - gray2bin(rd_ptr_gray_wsync2));
 
     // Leitura
-    logic [PTR_WIDTH-1:0] rd_ptr_bin, rd_ptr_gray;
     logic [PTR_WIDTH-1:0] wr_ptr_gray_rsync1, wr_ptr_gray_rsync2; // sincronizador 2-FF
 
     wire [ADDR_WIDTH-1:0] rd_addr = rd_ptr_bin[ADDR_WIDTH-1:0];
