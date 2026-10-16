@@ -18,10 +18,19 @@ package spw_defines_pkg;
     SPW_CHAR_FCT,
     SPW_CHAR_EOP,
     SPW_CHAR_EEP,
-    SPW_CHAR_ESC,
     SPW_CHAR_NULL,
-    SPW_CHAR_TIMECODE
-  } spw_char_type_e;
+    SPW_CHAR_TIMECODE,
+    SPW_CHAR_ERROR
+  } ds_char_kind_e;
+
+  /// Contains only "raw" characters, without NULLs/Timecodes
+  typedef enum bit [2:0] {
+    SPW_RAW_DATA,
+    SPW_RAW_FCT,
+    SPW_RAW_EOP,
+    SPW_RAW_EEP,
+    SPW_RAW_ESC
+  } ds_raw_kind_e;
 
   parameter bit [2:0] SPW_CHAR_FCT_CODE = 2'b00;
   parameter bit [2:0] SPW_CHAR_EOP_CODE = 2'b01;
@@ -36,22 +45,21 @@ package spw_defines_pkg;
     SPW_ST_STARTED,
     SPW_ST_CONNECTING,
     SPW_ST_RUN
-  } spw_link_state_e;
+  } link_state_e;
 
   // Error injection modes usable by both char-level driver and link-partner agent
   typedef enum bit [2:0] {
     SPW_ERR_NONE,
-    SPW_ERR_PARITY, // flip parity bit deliberately
-    SPW_ERR_ESCAPE, // invalid character following ESC
-    SPW_ERR_CREDIT_VIOLATE, // send more data than granted FCT credit
-    SPW_ERR_DISCONNECT, // stop toggling D/S to force timeout
-    SPW_ERR_TRUNC_EOP // truncate packet with EOP unexpectedly early
-  } spw_err_inject_e;
+    SPW_ERR_PARITY, // parity mismatch
+    SPW_ERR_ESC, // invalid character following ESC
+    SPW_ERR_DISCONNECT // do D/S transitions for the disconnect window
+  } ds_err_e;
 
   typedef enum int {
     SPW_CFG_RESET,
     SPW_CFG_SPEED
-  } spw_config_type_e;
+  } ds_config_kind_e;
+
 
   // Flow control credit limits (ECSS-E-ST-50-12C 8.5.3)
   parameter int SPW_FCT_CREDIT_STEP = 8; // bytes granted per FCT

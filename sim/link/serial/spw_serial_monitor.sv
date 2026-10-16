@@ -17,8 +17,10 @@ package serial_monitor_pkg;
     logic recovered_clk_rx;
     logic recovered_clk_tx;
 
-    uvm_analysis_port #(spw_serial_char_item) rx_analysis_port;
-    uvm_analysis_port #(spw_serial_char_item) tx_analysis_port;
+    // analysis port connected to the IP RX side
+    uvm_analysis_port #(ds_raw_item) rx_raw_ap;
+    // analysis port connected to the IP TX side
+    uvm_analysis_port #(ds_raw_item) tx_raw_ap;
 
     function new(string name, uvm_component parent);
       super.new(name, parent);
@@ -27,8 +29,8 @@ package serial_monitor_pkg;
     virtual function void build_phase(uvm_phase phase);
       super.build_phase(phase);
 
-      rx_analysis_port = new("rx_analysis_port", this);
-      tx_analysis_port = new("tx_analysis_port", this);
+      rx_raw_ap = new("rx_raw_ap", this);
+      tx_raw_ap = new("tx_raw_ap", this);
 
       if (!uvm_config_db #(virtual spw_serial_if)::get(this, "", "vif", vif)) begin
         `uvm_fatal(get_type_name(), "Didn't get handle to virtual interface spw_serial_if")
@@ -98,20 +100,14 @@ package serial_monitor_pkg;
     virtual task decode_char(bit tx_path);
       bit [7:0] prev_char_buf;
       bit [1:0] ctl_char_code;
-      spw_char_type_e prev_typ;
+      spw_raw_type_e prev_typ;
       bit curr_char_flag;
       bit curr_parity_bit;
       bit parity_result = 0;
-      bit cached_esc_parity_err = 0;
       bit first = 1;
-      bit seen_esc = 0;
-      bit is_null = 0;
-      bit is_timecode = 0;
-      spw_serial_char_item item;
+      ds_raw_item item;
 
       forever begin
-        is_null = 0;
-        is_timecode = 0;
         // get the parity bit and flag bit
         get_d(tx_path, curr_parity_bit);
         get_d(tx_path, curr_char_flag);
@@ -122,37 +118,28 @@ package serial_monitor_pkg;
         if (first)
           first = 0;
         else begin
-          item = spw_serial_char_item::type_id::create("item");
+          item = ds_raw_item::type_id::create("item");
           item.typ = prev_typ;
           item.data = 0;
           item.inject_parity_err = 0;
 
           // initiate the parity calculation according to the character type
           case (prev_typ)
-            SPW_CHAR_DATA : begin
+            SPW_RAW_DATA : begin
               item.data = prev_char_buf;
               parity_result = ^ prev_char_buf;
-              if (seen_esc)
-                is_timecode = 1;
-              seen_esc = 0;
             end
-            SPW_CHAR_FCT : begin
+            SPW_RAW_FCT : begin
               parity_result = ^ SPW_CHAR_FCT_CODE;
-              if (seen_esc)
-                is_null = 1;
-              seen_esc = 0;
             end
-            SPW_CHAR_EOP : begin
+            SPW_RAW_EOP : begin
               parity_result = ^ SPW_CHAR_EOP_CODE;
-              seen_esc = 0;
             end
-            SPW_CHAR_EEP : begin
+            SPW_RAW_EEP : begin
               parity_result = ^ SPW_CHAR_EEP_CODE;
-              seen_esc = 0;
             end
-            SPW_CHAR_ESC : begin
+            SPW_RAW_ESC : begin
               parity_result = ^ SPW_CHAR_ESC_CODE;
-              seen_esc = 1;
             end
             default : `uvm_fatal(get_type_name(), "shouldn't happen")
           endcase
@@ -160,28 +147,12 @@ package serial_monitor_pkg;
           // result in 1, because the parity field must produce odd parity.
           // if the parity_result is 0, we have a parity error
           parity_result = parity_result ^ curr_parity_bit ^ curr_char_flag;
-          item.parity_err_detected = ~parity_result;
+          item.got_parity_err = ~parity_result;
 
-          if (is_null) begin
-            item.typ = SPW_CHAR_NULL;
-          end
-          else if (is_timecode) begin
-            item.typ = SPW_CHAR_TIMECODE;
-          end
-
-          // since we're not sending the ESC, we cache the parity error and
-          // bundle it with the next character.
-          if (seen_esc) begin
-            cached_esc_parity_err = item.parity_err_detected;
-          end
-          else begin
-            item.parity_err_detected |= cached_esc_parity_err;
-            cached_esc_parity_err = 0;
-            if (tx_path)
-              tx_analysis_port.write(item);
-            else
-              rx_analysis_port.write(item);
-          end
+          if (tx_path)
+            tx_raw_ap.write(item);
+          else
+            rx_raw_ap.write(item);
         end
 
         // if the character is a control code
@@ -190,15 +161,15 @@ package serial_monitor_pkg;
           get_d(tx_path, ctl_char_code[0]);
 
           case (ctl_char_code)
-            SPW_CHAR_FCT_CODE : prev_typ = SPW_CHAR_FCT;
-            SPW_CHAR_EOP_CODE : prev_typ = SPW_CHAR_EOP;
-            SPW_CHAR_EEP_CODE : prev_typ = SPW_CHAR_EEP;
-            SPW_CHAR_ESC_CODE : prev_typ = SPW_CHAR_ESC;
+            SPW_CHAR_FCT_CODE : prev_typ = SPW_RAW_FCT;
+            SPW_CHAR_EOP_CODE : prev_typ = SPW_RAW_EOP;
+            SPW_CHAR_EEP_CODE : prev_typ = SPW_RAW_EEP;
+            SPW_CHAR_ESC_CODE : prev_typ = SPW_RAW_ESC;
             default : `uvm_fatal(get_type_name(), "invalid ctl char code")
           endcase
         end
         else begin // if the character is a NCHAR
-          prev_typ = SPW_CHAR_DATA;
+          prev_typ = SPW_RAW_DATA;
           for (int i = 0; i < 8; ++i) begin
             get_d(tx_path, prev_char_buf[i]);
           end

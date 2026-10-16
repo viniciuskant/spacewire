@@ -1,0 +1,16 @@
+sim/link/spw_defines.sv
+sim/link/spw_codec_utils.sv
+sim/link/serial/spw_serial_if.sv
+sim/link/serial/ds_item.sv
+sim/link/serial/spw_serial_driver.sv
+sim/link/serial/spw_serial_monitor.sv
+sim/link/serial/spw_char_decoder.sv
+sim/link/host/spw_host_if.sv
+sim/link/host/spw_host_driver.sv
+sim/link/host/spw_host_monitor.sv
+sim/link/selftest/spw_selftest_agent.sv
+sim/link/selftest/spw_selftest_env.sv
+sim/link/selftest/spw_selftest_checker.sv
+sim/link/selftest/spw_selftest_seq.sv
+sim/link/selftest/spw_selftest_test.sv
+sim/link/selftest/spw_selftest_top.sv

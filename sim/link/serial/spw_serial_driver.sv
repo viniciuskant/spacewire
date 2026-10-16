@@ -5,14 +5,14 @@ package serial_driver_pkg;
   import spw_defines_pkg::*;
   `include "uvm_macros.svh"
 
-  class spw_serial_driver extends uvm_driver #(
-    spw_serial_base_item
+  class ds_driver extends uvm_driver #(
+    ds_base_item
   );
-    `uvm_component_utils(spw_serial_driver)
+    `uvm_component_utils(ds_driver)
 
     virtual spw_serial_if vif;
 
-    uvm_analysis_port #(spw_serial_char_item) ap;
+    uvm_analysis_port #(ds_raw_item) ap;
 
     realtime bit_period = 100ns; // default 10MHz rate
     spw_encoder_util encoder;
@@ -23,6 +23,7 @@ package serial_driver_pkg;
     function new(string name, uvm_component parent);
       super.new(name, parent);
       ap = new("ap", this);
+      reset();
     endfunction
 
     virtual function automatic void reset();
@@ -46,9 +47,9 @@ package serial_driver_pkg;
     endfunction
 
     virtual task run_phase(uvm_phase phase);
-      spw_serial_base_item item;
-      spw_serial_char_item ch_item;
-      spw_serial_config_item cfg_item;
+      ds_base_item item;
+      ds_raw_item ch_item;
+      ds_config_item cfg_item;
 
       reset();
 
@@ -66,28 +67,20 @@ package serial_driver_pkg;
         else if ($cast(ch_item, item)) begin
           ap.write(ch_item);
           case (ch_item.typ)
-            SPW_CHAR_DATA : begin
+            SPW_RAW_DATA : begin
               send_nchar(encoder.encode_n_char(ch_item.data, ch_item.inject_parity_err));
             end
-            SPW_CHAR_FCT : begin
+            SPW_RAW_FCT : begin
               send_ctl(encoder.encode_fct(ch_item.inject_parity_err));
             end
-            SPW_CHAR_EOP : begin
+            SPW_RAW_EOP : begin
               send_ctl(encoder.encode_eop(ch_item.inject_parity_err));
             end
-            SPW_CHAR_EEP : begin
+            SPW_RAW_EEP : begin
               send_ctl(encoder.encode_eep(ch_item.inject_parity_err));
             end
-            SPW_CHAR_ESC : begin
+            SPW_RAW_ESC : begin
               send_ctl(encoder.encode_esc(ch_item.inject_parity_err));
-            end
-            SPW_CHAR_NULL : begin
-              send_ctl(encoder.encode_esc(ch_item.inject_parity_err));
-              send_ctl(encoder.encode_fct(0));
-            end
-            SPW_CHAR_TIMECODE : begin
-              send_ctl(encoder.encode_esc(ch_item.inject_parity_err));
-              send_nchar(encoder.encode_n_char(ch_item.data, 0));
             end
           endcase
         end
