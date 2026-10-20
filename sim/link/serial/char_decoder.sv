@@ -1,13 +1,16 @@
 
 package char_decoder_pkg;
-import serial_item_pkg::*;
+import ds_item_pkg::*;
 import spw_defines_pkg::*;
 import uvm_pkg::*;
 `include "uvm_macros.svh"
+/// Decodes raw DS characters (ESC + DATA/FCT) into composed
+/// characters (NULL/TIMECODE)
 class char_decoder extends uvm_subscriber #(ds_raw_item);
 
   `uvm_component_utils(char_decoder)
 
+  // this analysis port connects to the monitor's port
   uvm_analysis_port #(ds_char_item) char_ap;
   protected bit esc_pending;
   protected ds_raw_item esc_token;
@@ -69,9 +72,6 @@ class char_decoder extends uvm_subscriber #(ds_raw_item);
             end
         end
     endcase
-
-
   endfunction
-
 endclass
 endpackage

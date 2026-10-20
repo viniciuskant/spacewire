@@ -1,12 +1,12 @@
-package serial_monitor_pkg;
+package ds_monitor_pkg;
 
   import uvm_pkg::*;
-  import serial_item_pkg::*;
+  import ds_item_pkg::*;
   import spw_defines_pkg::*;
   `include "uvm_macros.svh"
 
-  class spw_serial_monitor extends uvm_monitor;
-    `uvm_component_utils(spw_serial_monitor)
+  class ds_monitor extends uvm_monitor;
+    `uvm_component_utils(ds_monitor)
 
     virtual spw_serial_if vif;
 
@@ -100,7 +100,7 @@ package serial_monitor_pkg;
     virtual task decode_char(bit tx_path);
       bit [7:0] prev_char_buf;
       bit [1:0] ctl_char_code;
-      spw_raw_type_e prev_typ;
+      ds_raw_kind_e prev_typ;
       bit curr_char_flag;
       bit curr_parity_bit;
       bit parity_result = 0;

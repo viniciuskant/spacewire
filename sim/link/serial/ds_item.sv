@@ -1,4 +1,4 @@
-package serial_item_pkg;
+package ds_item_pkg;
   import uvm_pkg::*;
   import spw_defines_pkg::*;
   `include "uvm_macros.svh"
@@ -53,6 +53,8 @@ package serial_item_pkg;
 
   class ds_char_item extends uvm_sequence_item;
     rand ds_char_kind_e typ;
+    rand bit inject_parity_err;
+    rand bit inject_esc_err;
     rand bit [7:0] data; // valid for SPW_CHAR_DATA
     ds_err_e err; // set by the decoder, ERR_NONE for valid characters
     ds_raw_item bad_raw; // raw item that triggered the error
@@ -60,6 +62,8 @@ package serial_item_pkg;
     `uvm_object_utils_begin(ds_char_item)
       `uvm_field_enum(ds_char_kind_e, typ, UVM_ALL_ON)
       `uvm_field_int(data, UVM_ALL_ON)
+      `uvm_field_int(inject_esc_err, UVM_ALL_ON)
+      `uvm_field_int(inject_parity_err, UVM_ALL_ON)
     `uvm_object_utils_end
 
     function new(string name = "ds_char_item");
@@ -71,6 +75,9 @@ package serial_item_pkg;
     }
     constraint ctl_no_data {
       (typ != SPW_CHAR_DATA && typ != SPW_CHAR_TIMECODE) -> (data == 0);
+    }
+    constraint c_esc_err {
+      (typ != SPW_CHAR_TIMECODE && typ != SPW_CHAR_NULL) -> (inject_esc_err == 0);
     }
 
     virtual function string convert2string();

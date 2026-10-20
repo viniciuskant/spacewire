@@ -1,6 +1,6 @@
-package serial_driver_pkg;
+package ds_driver_pkg;
   import uvm_pkg::*;
-  import serial_item_pkg::*;
+  import ds_item_pkg::*;
   import codec_utils_pkg::*;
   import spw_defines_pkg::*;
   `include "uvm_macros.svh"
