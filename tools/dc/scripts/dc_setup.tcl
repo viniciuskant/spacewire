@@ -6,7 +6,9 @@ set TOP_MODULE_NAME codec
 set DESIGN rvx
 
 #source "${SETUP_DIR}/setup_ihp.tcl"
-source "${SETUP_DIR}/setup_saed32.tcl"
+#source "${SETUP_DIR}/setup_saed32.tcl"
+source "${SETUP_DIR}/setup_saed90.tcl"
+
 
 set_app_var compile_seqmap_propagate_high_effort false
 
