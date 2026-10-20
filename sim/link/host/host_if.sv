@@ -1,31 +1,39 @@
-interface spw_host_if(
-  logic sys_clk_50mhz,
-  logic tx_clk_200mhz
+/// Host side of the codec (rtl/codec.sv). Signal names follow the DUT ports.
+/// Everything is synchronous to clk_system.
+interface spw_host_if (
+  input logic clk_system,
+  input logic rst_n
 );
-  logic [7:0] tx_data;
-  logic tx_write;
-  logic tx_ready;
-  logic tx_eop;
-  logic tx_eep;
+  logic [7:0] div_counter_tx;
 
-  logic [7:0] rx_data;
-  logic rx_valid;
-  logic rx_read;
-  logic rx_eop;
-  logic rx_eep;
+  // TX FIFO: [8] = 0 -> data in [7:0], [8] = 1 -> control (EOP/EEP)
+  logic [8:0] SpW_Packet_TX;
+  logic SpW_Packet_TX_en;
+  logic full_tx_fifo;
 
-  logic link_start;
-  logic auto_start;
-  logic link_disable;
+  // RX FIFO, first word fall through: SpW_Packet_RX is valid while !empty_rx_fifo
+  logic [8:0] SpW_Packet_RX;
+  logic SpW_Packet_RX_en;
+  logic empty_rx_fifo;
 
-  logic [7:0] tx_clk_div;
+  logic [7:0] Time_Code_TX;
+  logic Time_Code_TX_valid;
+  logic [7:0] Time_Code_RX;
+  logic Time_Code_RX_valid;
 
-  // status and error reporting
-  // 0: ErrorReset, 1: ErrorWait, 2: Connecting, 3: Started, 4: Run
-  logic [2:0] link_state;
+  clocking drv_cb @(posedge clk_system);
+    output div_counter_tx;
+    output SpW_Packet_TX, SpW_Packet_TX_en;
+    output SpW_Packet_RX_en;
+    output Time_Code_TX, Time_Code_TX_valid;
+    input full_tx_fifo, empty_rx_fifo;
+  endclocking
 
-  logic err_parity;
-  logic err_disconnect;
-  logic err_escape;
-  logic err_credit;
+  clocking mon_cb @(posedge clk_system);
+    input SpW_Packet_TX, SpW_Packet_TX_en, full_tx_fifo;
+    input SpW_Packet_RX, SpW_Packet_RX_en, empty_rx_fifo;
+    input Time_Code_TX, Time_Code_TX_valid;
+    input Time_Code_RX, Time_Code_RX_valid;
+  endclocking
+
 endinterface
