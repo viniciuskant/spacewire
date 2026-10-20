@@ -18,6 +18,8 @@ package selftest_test_pkg;
     virtual function void build_phase(uvm_phase phase);
       super.build_phase(phase);
       env0 = spw_selftest_env::type_id::create("env0", this);
+      // a hung sequence or monitor fails the test instead of running forever
+      uvm_root::get().set_timeout(10ms, 1);
 
       if (!uvm_config_db #(virtual spw_serial_if)::get(this, "", "vif", vif)) begin
         `uvm_fatal(get_type_name(), "Didn't get handle to virtual interface spw_serial_if")
@@ -34,7 +36,7 @@ package selftest_test_pkg;
       phase.raise_objection(this);
       seq.start(env0.a0.s0);
       // allow bits to traverse driver and checker
-      phase.phase_done.set_drain_time(this, 50us);
+      phase.get_objection().set_drain_time(this, 5us);
       phase.drop_objection(this);
     endtask
 

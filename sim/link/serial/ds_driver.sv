@@ -12,7 +12,10 @@ package ds_driver_pkg;
 
     virtual spw_serial_if vif;
 
+    // every raw character, right before it is sent
     uvm_analysis_port #(ds_raw_item) ap;
+    // every character item, right before it is sent
+    uvm_analysis_port #(ds_char_item) char_ap;
 
     realtime bit_period = 100ns; // default 10MHz rate
     spw_encoder_util encoder;
@@ -23,9 +26,10 @@ package ds_driver_pkg;
     function new(string name, uvm_component parent);
       super.new(name, parent);
       ap = new("ap", this);
-      reset();
+      char_ap = new("char_ap", this);
     endfunction
 
+    // only call from run_phase: it drives the interface
     virtual function automatic void reset();
       bit_period = 100ns;
       encoder = new();
@@ -48,7 +52,8 @@ package ds_driver_pkg;
 
     virtual task run_phase(uvm_phase phase);
       ds_base_item item;
-      ds_raw_item ch_item;
+      ds_char_item char_item;
+      ds_raw_item raw_item;
       ds_config_item cfg_item;
 
       reset();
@@ -64,25 +69,12 @@ package ds_driver_pkg;
             default : `uvm_fatal(get_type_name(), "invalid cfg_item type")
           endcase
         end
-        else if ($cast(ch_item, item)) begin
-          ap.write(ch_item);
-          case (ch_item.typ)
-            SPW_RAW_DATA : begin
-              send_nchar(encoder.encode_n_char(ch_item.data, ch_item.inject_parity_err));
-            end
-            SPW_RAW_FCT : begin
-              send_ctl(encoder.encode_fct(ch_item.inject_parity_err));
-            end
-            SPW_RAW_EOP : begin
-              send_ctl(encoder.encode_eop(ch_item.inject_parity_err));
-            end
-            SPW_RAW_EEP : begin
-              send_ctl(encoder.encode_eep(ch_item.inject_parity_err));
-            end
-            SPW_RAW_ESC : begin
-              send_ctl(encoder.encode_esc(ch_item.inject_parity_err));
-            end
-          endcase
+        else if ($cast(char_item, item)) begin
+          char_ap.write(char_item);
+          send_char(char_item);
+        end
+        else if ($cast(raw_item, item)) begin
+          send_raw_item(raw_item);
         end
         else begin
           `uvm_fatal(get_type_name(), "invalid sequence item")
@@ -92,6 +84,56 @@ package ds_driver_pkg;
       end
 
     endtask
+
+    // Splits a character into raw characters.
+    // NULL and TIMECODE get the parity error injected in their ESC
+    local task send_char(ds_char_item c);
+      case (c.typ)
+        SPW_CHAR_DATA:     send_raw(SPW_RAW_DATA, c.data, c.inject_parity_err);
+        SPW_CHAR_EOP:      send_raw(SPW_RAW_EOP, 0, c.inject_parity_err);
+        SPW_CHAR_EEP:      send_raw(SPW_RAW_EEP, 0, c.inject_parity_err);
+        SPW_CHAR_FCT:      send_raw(SPW_RAW_FCT, 0, c.inject_parity_err);
+        SPW_CHAR_NULL:     begin
+          send_raw(SPW_RAW_ESC, 0, c.inject_parity_err);
+          // send another ESC on purpose
+          // TODO: change this to send EOP/EEP as well
+          if (c.inject_esc_err) begin
+            send_raw(SPW_RAW_ESC);
+          end else begin
+            send_raw(SPW_RAW_FCT);
+          end
+        end
+        SPW_CHAR_TIMECODE: begin
+          send_raw(SPW_RAW_ESC, 0, c.inject_parity_err);
+          // send another ESC on purpose
+          // TODO: change this to send EOP/EEP as well
+          if (c.inject_esc_err) begin
+            send_raw(SPW_RAW_ESC);
+          end else begin
+            send_raw(SPW_RAW_DATA, c.data);
+          end
+        end
+        default: `uvm_fatal(get_type_name(), $sformatf("can't transmit %s", c.convert2string()))
+      endcase
+    endtask
+
+    local task send_raw(ds_raw_kind_e k, bit [7:0] d = 0, bit parity_err = 0);
+      ds_raw_item t = ds_raw_item::type_id::create("t");
+      t.typ = k;  t.data = d;  t.inject_parity_err = parity_err;
+      send_raw_item(t);
+    endtask
+
+    local task send_raw_item(ds_raw_item t);
+      ap.write(t);
+      case (t.typ)
+        SPW_RAW_DATA : send_nchar(encoder.encode_n_char(t.data, t.inject_parity_err));
+        SPW_RAW_FCT  : send_ctl(encoder.encode_fct(t.inject_parity_err));
+        SPW_RAW_EOP  : send_ctl(encoder.encode_eop(t.inject_parity_err));
+        SPW_RAW_EEP  : send_ctl(encoder.encode_eep(t.inject_parity_err));
+        SPW_RAW_ESC  : send_ctl(encoder.encode_esc(t.inject_parity_err));
+      endcase
+    endtask
+
     local task send_ctl(bit [0:3] bits);
       send_bits(4, {bits, 6'b0});
     endtask

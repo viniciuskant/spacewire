@@ -11,15 +11,17 @@ package ds_monitor_pkg;
     virtual spw_serial_if vif;
 
     // clean, stable signals
-    logic filtered_sin, filtered_din;
-    logic filtered_sout, filtered_dout;
+    logic filtered_sin = 0, filtered_din = 0;
+    logic filtered_sout = 0, filtered_dout = 0;
 
-    logic recovered_clk_rx;
-    logic recovered_clk_tx;
+    // recovered from din/sin (what the IP receives)
+    logic recovered_clk_rx = 0;
+    // recovered from dout/sout (what the IP transmits)
+    logic recovered_clk_tx = 0;
 
-    // analysis port connected to the IP RX side
+    // analysis port connected to the IP RX side (din/sin)
     uvm_analysis_port #(ds_raw_item) rx_raw_ap;
-    // analysis port connected to the IP TX side
+    // analysis port connected to the IP TX side (dout/sout)
     uvm_analysis_port #(ds_raw_item) tx_raw_ap;
 
     function new(string name, uvm_component parent);
@@ -55,10 +57,10 @@ package ds_monitor_pkg;
     virtual task recover_clock();
       // shift registers for filtering
       logic [2:0] din_shift, sin_shift;
-      logic next_din, next_sin;
+      logic next_din = 0, next_sin = 0;
 
       logic [2:0] dout_shift, sout_shift;
-      logic next_dout, next_sout;
+      logic next_dout = 0, next_sout = 0;
 
       forever begin
         @(posedge vif.fast_clk);
@@ -87,104 +89,76 @@ package ds_monitor_pkg;
         if (sout_shift == 3'b111)
           next_sout = 1;
 
-        filtered_din <= next_din;
-        filtered_sin <= next_sin;
-        recovered_clk_tx <= next_din ^ next_sin;
+        // class properties can't take nonblocking assignments. The data is
+        // updated before the clock, so get_d() always samples the new value
+        filtered_din = next_din;
+        filtered_sin = next_sin;
+        recovered_clk_rx = next_din ^ next_sin;
 
-        filtered_dout <= next_dout;
-        filtered_sout <= next_sout;
-        recovered_clk_rx <= next_dout ^ next_sout;
+        filtered_dout = next_dout;
+        filtered_sout = next_sout;
+        recovered_clk_tx = next_dout ^ next_sout;
       end
     endtask
 
+    // Each character is published as soon as its last bit arrives. Its
+    // parity bit covers the previous character's payload plus its own parity
+    // and control flag, so a parity error belongs to the character that
+    // carries the wrong parity bit.
     virtual task decode_char(bit tx_path);
-      bit [7:0] prev_char_buf;
+      bit [7:0] data;
       bit [1:0] ctl_char_code;
-      ds_raw_kind_e prev_typ;
-      bit curr_char_flag;
-      bit curr_parity_bit;
-      bit parity_result = 0;
-      bit first = 1;
+      bit char_flag;
+      bit parity_bit;
+      bit prev_payload_xor = 0;
       ds_raw_item item;
 
       forever begin
-        // get the parity bit and flag bit
-        get_d(tx_path, curr_parity_bit);
-        get_d(tx_path, curr_char_flag);
+        get_d(tx_path, parity_bit);
+        get_d(tx_path, char_flag);
 
-        // If it's not the first parity bit, we'll create the item.
-        // We can only send the previous item after receiving the next item's
-        // parity bit and control flag, so we can check the parity.
-        if (first)
-          first = 0;
-        else begin
-          item = ds_raw_item::type_id::create("item");
-          item.typ = prev_typ;
-          item.data = 0;
-          item.inject_parity_err = 0;
+        item = ds_raw_item::type_id::create("item");
+        item.data = 0;
+        item.inject_parity_err = 0;
+        // odd parity: a correct character always xors to 1
+        item.got_parity_err = ~(prev_payload_xor ^ parity_bit ^ char_flag);
 
-          // initiate the parity calculation according to the character type
-          case (prev_typ)
-            SPW_RAW_DATA : begin
-              item.data = prev_char_buf;
-              parity_result = ^ prev_char_buf;
-            end
-            SPW_RAW_FCT : begin
-              parity_result = ^ SPW_CHAR_FCT_CODE;
-            end
-            SPW_RAW_EOP : begin
-              parity_result = ^ SPW_CHAR_EOP_CODE;
-            end
-            SPW_RAW_EEP : begin
-              parity_result = ^ SPW_CHAR_EEP_CODE;
-            end
-            SPW_RAW_ESC : begin
-              parity_result = ^ SPW_CHAR_ESC_CODE;
-            end
-            default : `uvm_fatal(get_type_name(), "shouldn't happen")
-          endcase
-          // the parity calculation of a character without error must always
-          // result in 1, because the parity field must produce odd parity.
-          // if the parity_result is 0, we have a parity error
-          parity_result = parity_result ^ curr_parity_bit ^ curr_char_flag;
-          item.got_parity_err = ~parity_result;
-
-          if (tx_path)
-            tx_raw_ap.write(item);
-          else
-            rx_raw_ap.write(item);
-        end
-
-        // if the character is a control code
-        if (curr_char_flag) begin
+        if (char_flag) begin // control character
           get_d(tx_path, ctl_char_code[1]);
           get_d(tx_path, ctl_char_code[0]);
 
           case (ctl_char_code)
-            SPW_CHAR_FCT_CODE : prev_typ = SPW_RAW_FCT;
-            SPW_CHAR_EOP_CODE : prev_typ = SPW_RAW_EOP;
-            SPW_CHAR_EEP_CODE : prev_typ = SPW_RAW_EEP;
-            SPW_CHAR_ESC_CODE : prev_typ = SPW_RAW_ESC;
-            default : `uvm_fatal(get_type_name(), "invalid ctl char code")
+            SPW_CHAR_FCT_CODE : item.typ = SPW_RAW_FCT;
+            SPW_CHAR_EOP_CODE : item.typ = SPW_RAW_EOP;
+            SPW_CHAR_EEP_CODE : item.typ = SPW_RAW_EEP;
+            SPW_CHAR_ESC_CODE : item.typ = SPW_RAW_ESC;
           endcase
+          prev_payload_xor = ^ ctl_char_code;
         end
-        else begin // if the character is a NCHAR
-          prev_typ = SPW_RAW_DATA;
+        else begin // data character, LSB first
           for (int i = 0; i < 8; ++i) begin
-            get_d(tx_path, prev_char_buf[i]);
+            get_d(tx_path, data[i]);
           end
+          item.typ = SPW_RAW_DATA;
+          item.data = data;
+          prev_payload_xor = ^ data;
         end
+
+        if (tx_path)
+          tx_raw_ap.write(item);
+        else
+          rx_raw_ap.write(item);
       end
     endtask
 
     virtual task get_d(bit tx_path, output bit d);
       if (tx_path) begin
         @(recovered_clk_tx);
-        d = filtered_din;
+        d = filtered_dout;
       end
       else begin
         @(recovered_clk_rx);
-        d = filtered_dout;
+        d = filtered_din;
       end
     endtask
 

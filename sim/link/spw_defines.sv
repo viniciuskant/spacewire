@@ -32,10 +32,10 @@ package spw_defines_pkg;
     SPW_RAW_ESC
   } ds_raw_kind_e;
 
-  parameter bit [2:0] SPW_CHAR_FCT_CODE = 2'b00;
-  parameter bit [2:0] SPW_CHAR_EOP_CODE = 2'b01;
-  parameter bit [2:0] SPW_CHAR_EEP_CODE = 2'b10;
-  parameter bit [2:0] SPW_CHAR_ESC_CODE = 2'b11;
+  parameter bit [1:0] SPW_CHAR_FCT_CODE = 2'b00;
+  parameter bit [1:0] SPW_CHAR_EOP_CODE = 2'b01;
+  parameter bit [1:0] SPW_CHAR_EEP_CODE = 2'b10;
+  parameter bit [1:0] SPW_CHAR_ESC_CODE = 2'b11;
 
   // Link state machine per ECSS-E-ST-50-12C section 8.5
   typedef enum bit [3:0] {

@@ -6,6 +6,10 @@ import uvm_pkg::*;
 `include "uvm_macros.svh"
 /// Decodes raw DS characters (ESC + DATA/FCT) into composed
 /// characters (NULL/TIMECODE)
+///
+/// An ESC followed by EOP/EEP/ESC becomes SPW_CHAR_ERROR with err=SPW_ERR_ESC.
+/// A parity error in any of the raw characters sets got_parity_err and, for
+/// characters without an escape error, err=SPW_ERR_PARITY.
 class char_decoder extends uvm_subscriber #(ds_raw_item);
 
   `uvm_component_utils(char_decoder)
@@ -20,58 +24,55 @@ class char_decoder extends uvm_subscriber #(ds_raw_item);
     char_ap = new("char_ap", this);
   endfunction
 
+  /// Forget a pending ESC, e.g. after a link reset
+  function void reset();
+    esc_pending = 0;
+    esc_token = null;
+  endfunction
+
   function void write(ds_raw_item t);
-    ds_char_item c;
+    ds_char_item c = ds_char_item::type_id::create("c");
+    bit was_esc = esc_pending;
+
     c.data = 0;
     c.err = SPW_ERR_NONE;
+    c.got_parity_err = t.got_parity_err | (was_esc && esc_token.got_parity_err);
+    esc_pending = 0;
+
     case (t.typ)
         SPW_RAW_DATA: begin
-            if (esc_pending) begin
-                c.typ = SPW_CHAR_TIMECODE;
-                esc_pending = 0;
-            end else begin
-                c.typ = SPW_CHAR_DATA;
-            end
+            c.typ = was_esc ? SPW_CHAR_TIMECODE : SPW_CHAR_DATA;
             c.data = t.data;
         end
         SPW_RAW_FCT: begin
-            if (esc_pending) begin
-                c.typ = SPW_CHAR_NULL;
-                esc_pending = 0;
-            end else begin
-                c.typ = SPW_CHAR_FCT;
-            end
+            c.typ = was_esc ? SPW_CHAR_NULL : SPW_CHAR_FCT;
         end
         SPW_RAW_EOP: begin
-            if (esc_pending) begin
-                c.typ = SPW_CHAR_ERROR;
-                c.err = SPW_ERR_ESC;
-                c.bad_raw = t;
-                esc_pending = 0;
-            end else begin
-                c.typ = SPW_CHAR_EOP;
-            end
+            c.typ = SPW_CHAR_EOP;
         end
         SPW_RAW_EEP: begin
-            if (esc_pending) begin
-                c.typ = SPW_CHAR_ERROR;
-                c.err = SPW_ERR_ESC;
-                c.bad_raw = t;
-                esc_pending = 0;
-            end else begin
-            end
+            c.typ = SPW_CHAR_EEP;
         end
         SPW_RAW_ESC: begin
-            if (esc_pending) begin
-                c.typ = SPW_CHAR_ERROR;
-                c.err = SPW_ERR_ESC;
-                c.bad_raw = t;
-                esc_pending = 0;
-            end else begin
+            if (!was_esc) begin
+                // wait for the next character to decide what this is
                 esc_pending = 1;
+                esc_token = t;
+                return;
             end
         end
     endcase
+
+    if (was_esc && t.typ inside {SPW_RAW_EOP, SPW_RAW_EEP, SPW_RAW_ESC}) begin
+        c.typ = SPW_CHAR_ERROR;
+        c.err = SPW_ERR_ESC;
+        c.bad_raw = t;
+    end
+    else if (c.got_parity_err) begin
+        c.err = SPW_ERR_PARITY;
+    end
+
+    char_ap.write(c);
   endfunction
 endclass
 endpackage
