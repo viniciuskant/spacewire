@@ -1,11 +1,16 @@
 export PROJECT_ROOT=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 
 export RTL_DIR="$PROJECT_ROOT/rtl"
+export VERIF_DIR="$PROJECT_ROOT/verif"
+export CONSTRAINTS_DIR="$PROJECT_ROOT/common/constraints"
+export PDK_DIR="$PROJECT_ROOT/common/pdk"
+export SETUP_DIR="$PROJECT_ROOT/common/setup"
 
 export TOOLS_DIR="$PROJECT_ROOT/tools"
-export SETUP_DIR="$PROJECT_ROOT/tools/setup"
-export SYNTHESIS_DIR="$TOOLS_DIR/2_synthesis"
-export SCRIPTS_DIR="$SYNTHESIS_DIR/scripts"
+export DC_DIR="${TOOLS_DIR}/dc"
+export FC_DIR="${TOOLS_DIR}/fc"
+export FM_DIR="${TOOLS_DIR}/dc/fm"
+export VCS_DIR="${TOOLS_DIR}/dc/vcs"
 
 
 ### MODULES
@@ -21,3 +26,4 @@ MODULES=(
 for mod in "${MODULES[@]}"; do
     module load "${mod}" 2>/dev/null || true
 done
+

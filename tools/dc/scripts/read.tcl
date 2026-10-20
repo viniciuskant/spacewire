@@ -58,7 +58,7 @@ uniquify
 #set_dft_signal -view existing_dft -type ScanEnable  -port test_se
 
 # check design
-check_design > $REPORT_DIR/dc_check_design.rpt
+check_design > $REPORTS_DIR/dc_check_design.rpt
 
 write -f ddc -hier -out  $PRE_LAYOUT_DIR/${DESIGN}_unmapped.ddc
 

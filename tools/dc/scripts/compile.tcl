@@ -16,6 +16,7 @@ foreach pat {PAD_* VDD_* VSS_* IOVDD_* IOVSS_*} {
 #compile_ultra -no_autoungroup -scan
 compile_ultra -no_autoungroup
 
+
 # DFT I
 #create_test_protocol -infer_clock -infer_asynch
 #dft_drc
@@ -23,33 +24,33 @@ compile_ultra -no_autoungroup
 #insert_dft
 
 # Reports pós compile
-report_timing                     > $REPORT_DIR/2_post_compile_timing.rpt
-report_qor                        > $REPORT_DIR/2_post_compile_qor.rpt
-report_constraints -all_violators > $REPORT_DIR/2_post_compile_constraints.rpt
-report_power       -verbose       > $REPORT_DIR/2_post_compile_power.rpt
-check_design                      > $REPORT_DIR/2_post_compile_check_design.rpt
+report_timing                     > $REPORTS_DIR/2_post_compile_timing.rpt
+report_qor                        > $REPORTS_DIR/2_post_compile_qor.rpt
+report_constraints -all_violators > $REPORTS_DIR/2_post_compile_constraints.rpt
+report_power       -verbose       > $REPORTS_DIR/2_post_compile_power.rpt
+check_design                      > $REPORTS_DIR/2_post_compile_check_design.rpt
 
 # Opt
 #compile_ultra -scan -incremental
 compile_ultra -incremental
 
 # DFT II
-#dft_drc                                        > $REPORT_DIR/DFT_drc.rpt
-#report_scan_path -view existing_dft -chain all > $REPORT_DIR/DFT_report_scan_path.rpt
-#report_constraints -all_violators              > $REPORT_DIR/DFT_report_constraints.rpt
+#dft_drc                                        > $REPORTS_DIR/DFT_drc.rpt
+#report_scan_path -view existing_dft -chain all > $REPORTS_DIR/DFT_report_scan_path.rpt
+#report_constraints -all_violators              > $REPORTS_DIR/DFT_report_constraints.rpt
 #write_scan_def -output                           $PRE_LAYOUT_DIR/$DESIGN.scandeff
 
 # Reports pós incremental
-report_timing                     > $REPORT_DIR/3_inc_compile_timing.rpt
-report_qor                        > $REPORT_DIR/3_inc_compile_qor.rpt
-report_constraints -all_violators > $REPORT_DIR/3_inc_compile_constraints.rpt
-report_power       -verbose       > $REPORT_DIR/3_inc_compile_power.rpt
-check_design                      > $REPORT_DIR/3_inc_compile_check_design.rpt
+report_timing                     > $REPORTS_DIR/3_inc_compile_timing.rpt
+report_qor                        > $REPORTS_DIR/3_inc_compile_qor.rpt
+report_constraints -all_violators > $REPORTS_DIR/3_inc_compile_constraints.rpt
+report_power       -verbose       > $REPORTS_DIR/3_inc_compile_power.rpt
+check_design                      > $REPORTS_DIR/3_inc_compile_check_design.rpt
 
 # Datapath analysis
-analyze_datapath_extraction       > $REPORT_DIR/3_inc_compile_datapath_extraction.rpt
+analyze_datapath_extraction       > $REPORTS_DIR/3_inc_compile_datapath_extraction.rpt
 
-report_port                       > $REPORT_DIR/3_report_port.rpt
+report_port                       > $REPORTS_DIR/3_report_port.rpt
 
 ######################################################
 ## Outputs

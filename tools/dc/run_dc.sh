@@ -5,14 +5,15 @@ if [ -z "${PROJECT_ROOT:-}" ]; then
     exit 1
 fi
 
-TMP_DIR="$SYNTHESIS_DIR/.tmp"
-SCRIPTS_DIR="$SYNTHESIS_DIR/scripts"
+TMP_DIR="${DC_DIR}/.tmp"
+SCRIPTS_DIR="${DC_DIR}/scripts"
 
 rm -rf "$TMP_DIR"
 rm -rf "$PROJECT_ROOT/out_data/reports/syn"/* 2>/dev/null || true
 rm -rf "$PROJECT_ROOT/out_data/pre_layout"/* 2>/dev/null || true
 
 mkdir -p "$TMP_DIR"
+
 
 echo ">> Running Synthesis..."
 cd "$TMP_DIR"
