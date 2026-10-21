@@ -3,8 +3,17 @@ package ds_driver_pkg;
   import ds_item_pkg::*;
   import codec_utils_pkg::*;
   import spw_defines_pkg::*;
+  import ds_partner_pkg::*;
   `include "uvm_macros.svh"
 
+  /// Without a partner, items are sent as they come and the line is left
+  /// idle in between. With one, each character slot goes to, in order:
+  ///   1. an FCT, when the partner wants to grant credit
+  ///   2. the pending item; character items wait for the link, and N-chars
+  ///      also for credit from the DUT (raw items are sent as they are)
+  ///   3. a NULL, while the link is started
+  /// When the partner's link goes down the line drops to D = S = 0 and
+  /// parity restarts, like a transmitter reset.
   class ds_driver extends uvm_driver #(
     ds_base_item
   );
@@ -22,6 +31,8 @@ package ds_driver_pkg;
 
     bit last_d = 0;
     bit last_s = 0;
+
+    ds_partner partner; // set by the agent, null without a partner
 
     function new(string name, uvm_component parent);
       super.new(name, parent);
@@ -52,38 +63,92 @@ package ds_driver_pkg;
 
     virtual task run_phase(uvm_phase phase);
       ds_base_item item;
-      ds_char_item char_item;
-      ds_raw_item raw_item;
-      ds_config_item cfg_item;
+      bit tx_was_enabled = 0;
 
       reset();
 
       forever begin
-        seq_item_port.get_next_item(item);
-
-        // if the item is a configuration item
-        if ($cast(cfg_item, item)) begin
-          case (cfg_item.typ)
-            SPW_CFG_RESET : reset();
-            SPW_CFG_SPEED : set_speed(cfg_item.new_baud_rate_mhz);
-            default : `uvm_fatal(get_type_name(), "invalid cfg_item type")
-          endcase
-        end
-        else if ($cast(char_item, item)) begin
-          char_ap.write(char_item);
-          send_char(char_item);
-        end
-        else if ($cast(raw_item, item)) begin
-          send_raw_item(raw_item);
-        end
-        else begin
-          `uvm_fatal(get_type_name(), "invalid sequence item")
+        if (partner == null) begin
+          seq_item_port.get_next_item(item);
+          send_item(item);
+          seq_item_port.item_done();
+          continue;
         end
 
-        seq_item_port.item_done();
+        if (tx_was_enabled && !partner.tx_enabled()) tx_reset();
+        tx_was_enabled = partner.tx_enabled();
+
+        if (partner.tx_enabled() && partner.fct_wanted()) begin
+          partner.fct_sent();
+          send_auto(SPW_CHAR_FCT);
+          continue;
+        end
+
+        if (item == null) seq_item_port.try_next_item(item);
+        if (item != null && can_send(item)) begin
+          send_item(item);
+          seq_item_port.item_done();
+          item = null;
+          continue;
+        end
+
+        if (partner.tx_enabled())
+          send_auto(SPW_CHAR_NULL);
+        else
+          #(bit_period); // silent until the link starts
       end
-
     endtask
+
+    protected task send_item(ds_base_item item);
+      ds_char_item char_item;
+      ds_raw_item raw_item;
+      ds_config_item cfg_item;
+
+      if ($cast(cfg_item, item)) begin
+        case (cfg_item.typ)
+          SPW_CFG_RESET : reset();
+          SPW_CFG_SPEED : set_speed(cfg_item.new_baud_rate_mhz);
+          default : `uvm_fatal(get_type_name(), "invalid cfg_item type")
+        endcase
+      end
+      else if ($cast(char_item, item)) begin
+        char_ap.write(char_item);
+        send_char(char_item);
+      end
+      else if ($cast(raw_item, item)) begin
+        send_raw_item(raw_item);
+      end
+      else begin
+        `uvm_fatal(get_type_name(), "invalid sequence item")
+      end
+    endtask
+
+    // Only called with a partner. Takes the credit for an N-char.
+    protected function bit can_send(ds_base_item item);
+      ds_char_item c;
+      if (!$cast(c, item)) return 1;
+      if (!partner.tx_enabled()) return 0;
+      if (c.typ inside {SPW_CHAR_DATA, SPW_CHAR_EOP, SPW_CHAR_EEP})
+        return partner.take_tx_credit();
+      return 1;
+    endfunction
+
+    // characters the driver adds on its own (idle NULLs, credit FCTs)
+    protected task send_auto(ds_char_kind_e k);
+      ds_char_item c = ds_char_item::type_id::create("c");
+      c.typ = k;
+      char_ap.write(c);
+      send_char(c);
+    endtask
+
+    // link reset: the transmitter stops and the next character restarts parity
+    protected function void tx_reset();
+      encoder.reset_state();
+      last_d = 0;
+      last_s = 0;
+      vif.din <= 0;
+      vif.sin <= 0;
+    endfunction
 
     // Splits a character into raw characters.
     // NULL and TIMECODE get the parity error injected in their ESC

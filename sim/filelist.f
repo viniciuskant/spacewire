@@ -2,11 +2,12 @@ sim/link/spw_defines.sv
 sim/link/spw_codec_utils.sv
 sim/link/serial/ds_if.sv
 sim/link/serial/ds_item.sv
+sim/link/serial/ds_partner.sv
 sim/link/serial/ds_driver.sv
 sim/link/serial/ds_monitor.sv
 sim/link/serial/char_decoder.sv
 sim/link/serial/ds_agent.sv
-sim/link/serial/partner_sequencer.sv
+sim/link/serial/ds_seq_lib.sv
 sim/link/host/host_if.sv
 sim/link/host/host_item.sv
 sim/link/host/host_driver.sv
@@ -18,6 +19,7 @@ sim/link/selftest/spw_selftest_env.sv
 sim/link/selftest/spw_selftest_seq.sv
 sim/link/selftest/spw_selftest_test.sv
 sim/link/selftest/spw_selftest_top.sv
+sim/link/codec/codec_scoreboard.sv
 sim/link/codec/codec_env.sv
 sim/link/codec/codec_test_lib.sv
 sim/link/codec/codec_top.sv

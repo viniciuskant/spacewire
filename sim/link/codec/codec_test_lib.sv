@@ -3,6 +3,8 @@ package codec_test_lib_pkg;
   import spw_defines_pkg::*;
   import ds_item_pkg::*;
   import codec_env_pkg::*;
+  import host_seq_lib_pkg::*;
+  import ds_seq_lib_pkg::*;
   `include "uvm_macros.svh"
 
   class codec_base_test extends uvm_test;
@@ -30,7 +32,24 @@ package codec_test_lib_pkg;
       end
       uvm_config_db #(virtual spw_serial_if)::set(this, "env0.ds0.*", "vif", ds_vif);
       uvm_config_db #(virtual spw_host_if)::set(this, "env0.host0.*", "vif", host_vif);
+      uvm_config_db #(bit)::set(this, "env0.ds0", "has_partner", 1);
     endfunction
+
+    // returns 0 if the link did not come up in tmo
+    protected task wait_link_up(realtime tmo, output bit ok);
+      fork
+        begin
+          fork
+            env0.ds0.partner.link_up_ev.wait_on();
+            #(tmo);
+          join_any
+          disable fork;
+        end
+      join
+      ok = env0.ds0.partner.link_is_up();
+      if (!ok)
+        `uvm_error(get_type_name(), $sformatf("link not up %0t after the start of the test", tmo))
+    endtask
 
     // returns the time reset was released
     protected task wait_reset_done(output realtime t);
@@ -62,6 +81,8 @@ package codec_test_lib_pkg;
 
     virtual function void build_phase(uvm_phase phase);
       super.build_phase(phase);
+      // the partner stays silent
+      uvm_config_db #(bit)::set(this, "env0.ds0", "has_partner", 0);
       dut_chars = new("dut_chars", this);
     endfunction
 
@@ -147,5 +168,94 @@ package codec_test_lib_pkg;
         `uvm_info("SMOKE", $sformatf("%s: %0.2fus (expected %0.2fus)", what, got / 1us, exp / 1us), UVM_LOW)
       end
     endfunction
+  endclass
+
+  /// Brings the link up with the partner and checks it stays up
+  class codec_link_up_test extends codec_base_test;
+    `uvm_component_utils(codec_link_up_test)
+
+    realtime hold_time = 200us;
+
+    function new(string name = "codec_link_up_test", uvm_component parent = null);
+      super.new(name, parent);
+    endfunction
+
+    virtual task run_phase(uvm_phase phase);
+      bit ok;
+      realtime t_reset;
+      phase.raise_objection(this);
+      wait_reset_done(t_reset);
+      wait_link_up(100us, ok);
+      if (ok) begin
+        `uvm_info(get_type_name(), $sformatf("link up %0.2fus after reset",
+                                             (env0.ds0.partner.t_link_up - t_reset) / 1us), UVM_LOW)
+        #(hold_time);
+        if (env0.ds0.partner.link_ups != 1 || !env0.ds0.partner.link_is_up())
+          `uvm_error(get_type_name(), $sformatf("link did not stay up for %0t: %0d link ups, now in %s",
+                                                hold_time, env0.ds0.partner.link_ups,
+                                                env0.ds0.partner.state.name()))
+      end
+      phase.drop_objection(this);
+    endtask
+  endclass
+
+  /// Random packets and timecodes in both directions at once, with random
+  /// backpressure on the host RX FIFO to exercise flow control
+  class codec_packet_test extends codec_base_test;
+    `uvm_component_utils(codec_packet_test)
+
+    realtime traffic_timeout = 3ms;
+
+    host_packet_seq host_pkts;
+    host_timecode_seq host_tcs;
+    ds_packet_seq ds_pkts;
+    ds_timecode_seq ds_tcs;
+
+    function new(string name = "codec_packet_test", uvm_component parent = null);
+      super.new(name, parent);
+    endfunction
+
+    virtual function void build_phase(uvm_phase phase);
+      int unsigned rx_read_pct = $urandom_range(100, 5);
+      super.build_phase(phase);
+      uvm_config_db #(int unsigned)::set(this, "env0.host0.d0", "rx_read_pct", rx_read_pct);
+      `uvm_info(get_type_name(), $sformatf("rx_read_pct=%0d", rx_read_pct), UVM_LOW)
+
+      host_pkts = host_packet_seq::type_id::create("host_pkts");
+      host_tcs = host_timecode_seq::type_id::create("host_tcs");
+      ds_pkts = ds_packet_seq::type_id::create("ds_pkts");
+      ds_tcs = ds_timecode_seq::type_id::create("ds_tcs");
+      if (!host_pkts.randomize() || !host_tcs.randomize() || !ds_pkts.randomize() || !ds_tcs.randomize())
+        `uvm_fatal(get_type_name(), "Failed to randomize sequences")
+    endfunction
+
+    virtual task run_phase(uvm_phase phase);
+      bit ok;
+      phase.raise_objection(this);
+      wait_link_up(100us, ok);
+      if (ok) begin
+        fork
+          begin
+            fork
+              host_pkts.start(env0.host0.s0);
+              host_tcs.start(env0.host0.s0);
+              ds_pkts.start(env0.ds0.s0);
+              ds_tcs.start(env0.ds0.s0);
+            join
+          end
+          begin
+            #(traffic_timeout);
+            `uvm_error(get_type_name(), $sformatf("sequences not done after %0t: partner has %0d credit from the DUT",
+                                                  traffic_timeout, env0.ds0.partner.tx_credit))
+          end
+        join_any
+        disable fork;
+        env0.sb.wait_drained(500us);
+        if (env0.ds0.partner.link_ups != 1)
+          `uvm_error(get_type_name(), $sformatf("link went down during the test (%0d link ups)",
+                                                env0.ds0.partner.link_ups))
+      end
+      phase.drop_objection(this);
+    endtask
   endclass
 endpackage
