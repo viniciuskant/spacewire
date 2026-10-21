@@ -12,7 +12,7 @@ module tb_fifo1;
     logic winc, wclk, wrst_n;
     logic rinc, rclk, rrst_n;
 
-    fifo1 #(
+    async_fifo #(
         .DSIZE(DSIZE),
         .ASIZE(ASIZE)
     ) dut (

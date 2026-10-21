@@ -28,7 +28,7 @@ module tx(
     logic tc_fifo_wfull;
     logic tc_fifo_rinc;
 
-    fifo1 #(.DSIZE(8), .ASIZE(4)) u_tc_fifo ( // TODO não sei se seria extremamente necessário, mas acho válido para não perder time code
+    async_fifo #(.DSIZE(8), .ASIZE(4)) u_tc_fifo ( // TODO não sei se seria extremamente necessário, mas acho válido para não perder time code
         .wfull (tc_fifo_wfull),
         .rempty (tc_fifo_rempty),
         .wdata (timecode_i),
