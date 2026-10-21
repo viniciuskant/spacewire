@@ -14,7 +14,7 @@ switch -exact $PDK_MACRO {
     "SAED32" {
         source "${SETUP_DIR}/setup_saed32.tcl"
     }
-    "IHP130" - "ihp130" {
+    "IHP130" {
         source "${SETUP_DIR}/setup_ihp.tcl"
     }
     default {

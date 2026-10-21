@@ -14,7 +14,7 @@ foreach pat {PAD_* VDD_* VSS_* IOVDD_* IOVSS_*} {
 }
 
 #compile_ultra -no_autoungroup -scan
-compile_ultra -no_autoungroup
+compile_ultra -no_autoungroup -gate_clock 
 
 
 # DFT I
@@ -34,8 +34,8 @@ check_design                      > $REPORTS_DIR/2_post_compile_check_design.rpt
 set_clock_gating_style -sequential_cell latch \
     -control_point before \
     -control_signal scan_enable \
-    -minimum_bitwidth 4 \
-    -positive_edge_logic {integrated}
+    -minimum_bitwidth 4
+    # -positive_edge_logic {integrated}
 
 # Opt
 #compile_ultra -scan -incremental

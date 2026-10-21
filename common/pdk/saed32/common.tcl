@@ -31,3 +31,6 @@ set SRAM_DB_MIN "${SRAM_DB_DIR}/saed32sram_ff1p16v25c.db"
 set SRAM_DB_TYP "${SRAM_DB_DIR}/saed32sram_tt1p05v25c.db"
 
 set SRAM_VERILOG [list "${SRAM_VERILOG_DIR}/saed32sram.v"]
+
+# Clock Gating
+set CG_DB "${PDK_BASE}/STDCELL/DBs/saed90nm_max_lth_cg_hvt.db"

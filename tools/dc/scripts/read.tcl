@@ -24,10 +24,8 @@ set v_files [split [exec find $RTL_DIR -name "*.sv"] "\n"]
 
 #sram
 if { $PDK_MACRO eq "SAED90" } {
-    analyze -format verilog {
-        "${PDK_BASE}/saed90/MEMORIE/verilog/SRAM16x16.v"
-        "${PDK_BASE}/saed90/MEMORIE/verilog/SRAM16x64.v"
-    }
+    analyze -format verilog "${PDK_BASE}/MEMORIE/verilog/SRAM16x16.v"
+    analyze -format verilog "${PDK_BASE}/MEMORIE/verilog/SRAM16x64.v"
 } elseif { $PDK_MACRO eq "SAED32" } {
     analyze -format verilog "${PDK_BASE}/lib/sram/verilog/saed32sram.v"
 } else {
