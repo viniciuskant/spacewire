@@ -22,8 +22,18 @@ set verilogout_show_unconnected_pins true
 # Verilog
 set v_files [split [exec find $RTL_DIR -name "*.sv"] "\n"]
 
+# Cria uma lista Tcl válida com as variáveis expandidas
+set sram_models [list \
+    "${PDK_DIR}/saed90/MEMORIE/verilog/SRAM16x16.v" \
+    "${PDK_DIR}/saed90/MEMORIE/verilog/SRAM16x64.v" \
+]
+
+foreach f $sram_models {
+    analyze -format verilog $f
+}
+
 if {[llength $v_files] > 0} {
-    analyze -format sverilog -vcs "+incdir+${RTL_DIR}" $v_files
+    analyze -format sverilog -define $PDK_MACRO -vcs "+incdir+${RTL_DIR}" $v_files
 } else {
     puts "ERROR: No .sv files found in $RTL_DIR"
 }

@@ -12,6 +12,10 @@ set FC_DIR $::env(FC_DIR)
 set FM_DIR $::env(FM_DIR)
 set VCS_DIR $::env(VCS_DIR)
 
+set PDK_MACRO $::env(PDK_MACRO)
+set TOP_MODULE_NAME $::env(TOP_MODULE_NAME)
+
+
 
 source "${DC_DIR}/scripts/dc_setup.tcl"
 
@@ -20,4 +24,4 @@ source "${DC_DIR}/scripts/read.tcl"
 source "${CONSTRAINTS_DIR}/constraints.tcl"
 source "${DC_DIR}/scripts/compile.tcl"
 
-exit
+# exit

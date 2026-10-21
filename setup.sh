@@ -13,6 +13,9 @@ export FM_DIR="${TOOLS_DIR}/dc/fm"
 export VCS_DIR="${TOOLS_DIR}/dc/vcs"
 
 
+export PDK_MACRO=SAED90   # or SAED32, or IHP130
+export TOP_MODULE_NAME="codec"
+
 ### MODULES
 MODULES=(
     "syn/W-2024.09-SP5-2"

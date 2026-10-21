@@ -1,13 +1,28 @@
 # library dir & path
 set DC_DIR $DC_DIR
+set PDK_MACRO $PDK_MACRO
 
 # design setting
-set TOP_MODULE_NAME codec
 set DESIGN rvx
 
-source "${SETUP_DIR}/setup_ihp.tcl"
-#source "${SETUP_DIR}/setup_saed32.tcl"
-#source "${SETUP_DIR}/setup_saed90.tcl"
+
+# Seleciona o setup correspondente ou aborta com erro
+switch -exact $PDK_MACRO {
+    "SAED90" {
+        source "${SETUP_DIR}/setup_saed90.tcl"
+    }
+    "SAED32" {
+        source "${SETUP_DIR}/setup_saed32.tcl"
+    }
+    "IHP130" - "ihp130" {
+        source "${SETUP_DIR}/setup_ihp.tcl"
+    }
+    default {
+        puts "ERROR: Invalid PDK_NAME '$current_pdk'."
+        puts "Valid options are: 'SAED90', 'SAED32', or 'IHP130'."
+        exit 1
+    }
+}
 
 
 set_app_var compile_seqmap_propagate_high_effort false
