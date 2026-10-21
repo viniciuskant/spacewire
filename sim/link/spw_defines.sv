@@ -65,6 +65,9 @@ package spw_defines_pkg;
   parameter int SPW_FCT_CREDIT_STEP = 8; // bytes granted per FCT
   parameter int SPW_FCT_CREDIT_MAX = 56; // max outstanding credit (7 FCTs)
 
-  parameter realtime SPW_T_ERR_RST_DWELL = 12.8us;
-  parameter realtime SPW_T_ERR_WAIT_DWELL = 6.4us;
+  // link state machine timeouts (ECSS-E-ST-50-12C 8.5.2)
+  parameter realtime SPW_T_ERR_RST_DWELL = 6.4us;
+  parameter realtime SPW_T_ERR_WAIT_DWELL = 12.8us;
+  parameter realtime SPW_T_STARTED_TIMEOUT = 12.8us;
+  parameter realtime SPW_T_CONNECTING_TIMEOUT = 12.8us;
 endpackage

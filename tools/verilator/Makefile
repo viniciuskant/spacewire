@@ -24,7 +24,14 @@ selftest:
 host_selftest:
 	$(call run_test,host_selftest_test,host_selftest_top,host_selftest.f)
 
+# build once, then run any codec test: make codec TEST=codec_smoke_test
+TEST?=codec_smoke_test
+codec:
+	mkdir -p work && cd work && verilator $(VL_ARGS) --top-module codec_top -F ../$(SIM_ROOT)/codec.f \
+		--Mdir codec -o simv 2>&1 | tee codec_compile.log
+	cd work && ./codec/simv +UVM_TESTNAME=$(TEST) $(SIM_ARGS) 2>&1 | tee $(TEST)_run.log
+
 clean:
 	rm -rf work
 
-.PHONY: selftest host_selftest clean
+.PHONY: selftest host_selftest codec clean

@@ -18,3 +18,6 @@ sim/link/selftest/spw_selftest_env.sv
 sim/link/selftest/spw_selftest_seq.sv
 sim/link/selftest/spw_selftest_test.sv
 sim/link/selftest/spw_selftest_top.sv
+sim/link/codec/codec_env.sv
+sim/link/codec/codec_test_lib.sv
+sim/link/codec/codec_top.sv

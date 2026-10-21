@@ -42,5 +42,19 @@ package ds_agent_pkg;
       m0.tx_raw_ap.connect(tx_decoder.analysis_export);
     endfunction
 
+    // a half received NULL or timecode must not survive a link reset
+    virtual task run_phase(uvm_phase phase);
+      fork
+        forever begin
+          m0.rx_silence_ev.wait_trigger();
+          rx_decoder.reset();
+        end
+        forever begin
+          m0.tx_silence_ev.wait_trigger();
+          tx_decoder.reset();
+        end
+      join
+    endtask
+
   endclass
 endpackage
