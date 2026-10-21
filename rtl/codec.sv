@@ -138,7 +138,7 @@ module codec #(
     assign start_link = 1; // TODO verificar o que seria essa start_link, mas creio
                            // que seja um sinal externo para controle de quandoa ativar o rx
 
-    state_machine #(.CLK_FREQ(CLK_FREQ))u_sm(
+    state_machine #(.CLK_FREQ(SYS_CLK_FREQ_HZ))u_sm( // a máquina de estados roda em clk_system
         .clk(clk_system),
         .rst_n(rst_n),
 
