@@ -30,6 +30,13 @@ report_constraints -all_violators > $REPORTS_DIR/2_post_compile_constraints.rpt
 report_power       -verbose       > $REPORTS_DIR/2_post_compile_power.rpt
 check_design                      > $REPORTS_DIR/2_post_compile_check_design.rpt
 
+# Clock Gating
+set_clock_gating_style -sequential_cell latch \
+    -control_point before \
+    -control_signal scan_enable \
+    -minimum_bitwidth 4 \
+    -positive_edge_logic {integrated}
+
 # Opt
 #compile_ultra -scan -incremental
 compile_ultra -incremental
