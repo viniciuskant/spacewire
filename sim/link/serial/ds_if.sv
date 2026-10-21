@@ -6,6 +6,4 @@ interface spw_serial_if;
   logic dout;
   logic sout;
 
-  logic fast_clk;
-
 endinterface

@@ -19,10 +19,6 @@ module codec_top;
   spw_host_if hif (.clk_system(clk_system), .rst_n(rst_n));
   spw_serial_if sif ();
 
-  // 2 GHz clock for oversampling D/S in the DS monitor
-  initial sif.fast_clk = 0;
-  always #250ps sif.fast_clk = ~sif.fast_clk;
-
   codec dut (
     .clk_system (clk_system),
     .clk_ref_tx (clk_ref_tx),

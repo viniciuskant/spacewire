@@ -5,19 +5,16 @@ package ds_monitor_pkg;
   import spw_defines_pkg::*;
   `include "uvm_macros.svh"
 
+  /// Event-driven DS monitor: no sampling clock, it wakes on every change of
+  /// D or S. In DS encoding exactly one of them changes per bit, so a change
+  /// of D ^ S is a bit, and the bit is the value of D.
+  ///
+  /// Path 0 (rx) is din/sin, what the IP receives. Path 1 (tx) is
+  /// dout/sout, what the IP transmits.
   class ds_monitor extends uvm_monitor;
     `uvm_component_utils(ds_monitor)
 
     virtual spw_serial_if vif;
-
-    // clean, stable signals
-    logic filtered_sin = 0, filtered_din = 0;
-    logic filtered_sout = 0, filtered_dout = 0;
-
-    // recovered from din/sin (what the IP receives)
-    logic recovered_clk_rx = 0;
-    // recovered from dout/sout (what the IP transmits)
-    logic recovered_clk_tx = 0;
 
     // analysis port connected to the IP RX side (din/sin)
     uvm_analysis_port #(ds_raw_item) rx_raw_ap;
@@ -29,12 +26,27 @@ package ds_monitor_pkg;
     // resynchronizes after a link reset, where the transmitter sets D/S to 0.
     // Set with uvm_config_db #(realtime) "silence_timeout".
     realtime silence_timeout = 850ns;
+    // Two bits closer than this are reported as a glitch: half a bit at the
+    // fastest rate in docs/internal/spec.adoc, 200 Mbit/s (5 ns per bit).
+    // uvm_config_db #(realtime) "min_bit_period", 0 disables the check.
+    realtime min_bit_period = 2.5ns;
+    // D and S are read this long after they change, so that changes in the
+    // same time step settle first: a value that flips and flips back is not a bit
+    realtime settle_time = 1ps;
+
     // triggered when a path that was sending goes idle
     uvm_event rx_silence_ev;
     uvm_event tx_silence_ev;
 
-    // 1 while bits are arriving on the path, indexed by tx_path
-    protected bit active[2];
+    // per path state, indexed by tx_path
+    protected bit active[2];        // bits are arriving
+    protected realtime last_edge[2];
+    protected uvm_event active_ev[2]; // the path went from idle to active
+    protected int unsigned nbits[2];  // bits of the current character so far
+    protected bit parity_bit[2];
+    protected bit char_flag[2];
+    protected bit [7:0] payload[2];   // data LSB first, or the 2 control bits
+    protected bit prev_payload_xor[2];
 
     function new(string name, uvm_component parent);
       super.new(name, parent);
@@ -47,7 +59,10 @@ package ds_monitor_pkg;
       tx_raw_ap = new("tx_raw_ap", this);
       rx_silence_ev = new("rx_silence_ev");
       tx_silence_ev = new("tx_silence_ev");
+      active_ev[0] = new("rx_active_ev");
+      active_ev[1] = new("tx_active_ev");
       void'(uvm_config_db #(realtime)::get(this, "", "silence_timeout", silence_timeout));
+      void'(uvm_config_db #(realtime)::get(this, "", "min_bit_period", min_bit_period));
 
       if (!uvm_config_db #(virtual spw_serial_if)::get(this, "", "vif", vif)) begin
         `uvm_fatal(get_type_name(), "Didn't get handle to virtual interface spw_serial_if")
@@ -56,187 +71,129 @@ package ds_monitor_pkg;
 
     virtual task run_phase(uvm_phase phase);
       fork
-        recover_clock();
-        monitor_tx_path();
-        monitor_rx_path();
+        watch_edges(0);
+        watch_edges(1);
+        watch_silence(0);
+        watch_silence(1);
       join
-
     endtask
 
-    virtual task monitor_rx_path();
-      decode_char(0);
-    endtask
-    virtual task monitor_tx_path();
-      decode_char(1);
-    endtask
-    virtual task recover_clock();
-      // shift registers for filtering
-      logic [2:0] din_shift, sin_shift;
-      logic next_din = 0, next_sin = 0;
+    protected function string path_name(bit tx_path);
+      return tx_path ? "TX" : "RX";
+    endfunction
 
-      logic [2:0] dout_shift, sout_shift;
-      logic next_dout = 0, next_sout = 0;
+    // Turns D/S changes into bits
+    protected task watch_edges(bit tx_path);
+      logic d, s;
+      bit x, x_last = 0;
+      realtime t;
 
       forever begin
-        @(posedge vif.fast_clk);
-        din_shift = {din_shift[1:0], vif.din};
-        sin_shift = {sin_shift[1:0], vif.sin};
-        dout_shift = {dout_shift[1:0], vif.dout};
-        sout_shift = {sout_shift[1:0], vif.sout};
+        if (tx_path)
+          @(vif.dout or vif.sout);
+        else
+          @(vif.din or vif.sin);
+        t = $realtime;
+        #(settle_time);
 
-        if (din_shift == 3'b000)
-          next_din = 0;
-        if (din_shift == 3'b111)
-          next_din = 1;
+        d = tx_path ? vif.dout : vif.din;
+        s = tx_path ? vif.sout : vif.sin;
+        if ($isunknown({d, s})) continue; // before reset
+        x = d ^ s;
+        // nothing changed in the end, or D and S changed together (a
+        // transmitter reset): not a bit
+        if (x == x_last) continue;
+        x_last = x;
 
-        if (sin_shift == 3'b000)
-          next_sin = 0;
-        if (sin_shift == 3'b111)
-          next_sin = 1;
-
-        if (dout_shift == 3'b000)
-          next_dout = 0;
-        if (dout_shift == 3'b111)
-          next_dout = 1;
-
-        if (sout_shift == 3'b000)
-          next_sout = 0;
-        if (sout_shift == 3'b111)
-          next_sout = 1;
-
-        // class properties can't take nonblocking assignments. The data is
-        // updated before the clock, so get_d() always samples the new value
-        filtered_din = next_din;
-        filtered_sin = next_sin;
-        recovered_clk_rx = next_din ^ next_sin;
-
-        filtered_dout = next_dout;
-        filtered_sout = next_sout;
-        recovered_clk_tx = next_dout ^ next_sout;
+        if (active[tx_path] && min_bit_period > 0 && t - last_edge[tx_path] < min_bit_period) begin
+          `uvm_warning(get_type_name(), $sformatf("%s path: glitch, two bits %0t apart",
+                                                  path_name(tx_path), t - last_edge[tx_path]))
+        end
+        last_edge[tx_path] = t;
+        if (!active[tx_path]) begin
+          active[tx_path] = 1;
+          active_ev[tx_path].trigger();
+        end
+        push_bit(tx_path, d);
       end
     endtask
+
+    // Sleeps while bits arrive, and marks the path idle silence_timeout
+    // after its last edge. Wakes about once per silence_timeout, not per bit.
+    protected task watch_silence(bit tx_path);
+      forever begin
+        if (!active[tx_path]) active_ev[tx_path].wait_trigger();
+        while ($realtime < last_edge[tx_path] + silence_timeout)
+          #(last_edge[tx_path] + silence_timeout - $realtime);
+        go_idle(tx_path);
+      end
+    endtask
+
+    protected function void go_idle(bit tx_path);
+      if (nbits[tx_path] > 0) begin
+        `uvm_info(get_type_name(), $sformatf("%s path went idle %0d bits into a character, dropping it",
+                                             path_name(tx_path), nbits[tx_path]), UVM_MEDIUM)
+      end
+      active[tx_path] = 0;
+      nbits[tx_path] = 0;
+      prev_payload_xor[tx_path] = 0;
+      if (tx_path)
+        tx_silence_ev.trigger();
+      else
+        rx_silence_ev.trigger();
+    endfunction
 
     // Each character is published as soon as its last bit arrives. Its
     // parity bit covers the previous character's payload plus its own parity
     // and control flag, so a parity error belongs to the character that
     // carries the wrong parity bit.
-    virtual task decode_char(bit tx_path);
-      bit prev_payload_xor = 0;
-      int unsigned nbits;
-      bit ok;
-      ds_raw_item item;
+    protected function void push_bit(bit tx_path, bit d);
+      int unsigned n = nbits[tx_path];
 
-      forever begin
-        read_char(tx_path, prev_payload_xor, item, ok, nbits);
-        if (ok) begin
-          if (tx_path)
-            tx_raw_ap.write(item);
-          else
-            rx_raw_ap.write(item);
-        end
-        else begin
-          if (nbits > 0) begin
-            `uvm_info(get_type_name(), $sformatf("%s path went idle %0d bits into a character, dropping it",
-                                                 tx_path ? "TX" : "RX", nbits), UVM_MEDIUM)
-          end
-          prev_payload_xor = 0;
-          if (tx_path)
-            tx_silence_ev.trigger();
-          else
-            rx_silence_ev.trigger();
-        end
-      end
-    endtask
+      if (n == 0)
+        parity_bit[tx_path] = d;
+      else if (n == 1)
+        char_flag[tx_path] = d;
+      else if (char_flag[tx_path])
+        payload[tx_path][3 - n] = d; // control code, bit 1 first
+      else
+        payload[tx_path][n - 2] = d; // data, LSB first
+      nbits[tx_path] = n + 1;
 
-    // ok = 0 if the path went idle before the character was complete
-    protected task read_char(bit tx_path, inout bit prev_payload_xor, output ds_raw_item item,
-                             output bit ok, output int unsigned nbits);
-      bit [7:0] data;
-      bit [1:0] ctl_char_code;
-      bit char_flag;
-      bit parity_bit;
+      if (nbits[tx_path] == (char_flag[tx_path] ? 4 : 10) && nbits[tx_path] > 2)
+        publish_char(tx_path);
+    endfunction
 
-      nbits = 0;
-      item = null;
+    protected function void publish_char(bit tx_path);
+      ds_raw_item item = ds_raw_item::type_id::create("item");
+      bit [1:0] ctl_char_code = payload[tx_path][1:0];
 
-      get_d(tx_path, parity_bit, ok);
-      if (!ok) return;
-      nbits++;
-      get_d(tx_path, char_flag, ok);
-      if (!ok) return;
-      nbits++;
-
-      item = ds_raw_item::type_id::create("item");
       item.data = 0;
       item.inject_parity_err = 0;
       // odd parity: a correct character always xors to 1
-      item.got_parity_err = ~(prev_payload_xor ^ parity_bit ^ char_flag);
+      item.got_parity_err = ~(prev_payload_xor[tx_path] ^ parity_bit[tx_path] ^ char_flag[tx_path]);
 
-      if (char_flag) begin // control character
-        get_d(tx_path, ctl_char_code[1], ok);
-        if (!ok) return;
-        nbits++;
-        get_d(tx_path, ctl_char_code[0], ok);
-        if (!ok) return;
-        nbits++;
-
+      if (char_flag[tx_path]) begin // control character
         case (ctl_char_code)
           SPW_CHAR_FCT_CODE : item.typ = SPW_RAW_FCT;
           SPW_CHAR_EOP_CODE : item.typ = SPW_RAW_EOP;
           SPW_CHAR_EEP_CODE : item.typ = SPW_RAW_EEP;
           SPW_CHAR_ESC_CODE : item.typ = SPW_RAW_ESC;
         endcase
-        prev_payload_xor = ^ ctl_char_code;
+        prev_payload_xor[tx_path] = ^ ctl_char_code;
       end
-      else begin // data character, LSB first
-        for (int i = 0; i < 8; ++i) begin
-          get_d(tx_path, data[i], ok);
-          if (!ok) return;
-          nbits++;
-        end
+      else begin // data character
         item.typ = SPW_RAW_DATA;
-        item.data = data;
-        prev_payload_xor = ^ data;
+        item.data = payload[tx_path];
+        prev_payload_xor[tx_path] = ^ payload[tx_path];
       end
-    endtask
+      nbits[tx_path] = 0;
 
-    // Waits for the next bit. An idle path waits forever for its first
-    // transition; an active one gives up after silence_timeout (ok = 0).
-    virtual task get_d(bit tx_path, output bit d, output bit ok);
-      bit timed_out = 0;
-      ok = 1;
-      if (!active[tx_path]) begin
-        wait_edge(tx_path);
-        active[tx_path] = 1;
-      end
-      else begin
-        fork
-          begin
-            fork
-              wait_edge(tx_path);
-              begin
-                #(silence_timeout);
-                timed_out = 1;
-              end
-            join_any
-            disable fork;
-          end
-        join
-        if (timed_out) begin
-          ok = 0;
-          active[tx_path] = 0;
-          return;
-        end
-      end
-      d = tx_path ? filtered_dout : filtered_din;
-    endtask
-
-    protected task wait_edge(bit tx_path);
       if (tx_path)
-        @(recovered_clk_tx);
+        tx_raw_ap.write(item);
       else
-        @(recovered_clk_rx);
-    endtask
+        rx_raw_ap.write(item);
+    endfunction
 
   endclass
 endpackage
