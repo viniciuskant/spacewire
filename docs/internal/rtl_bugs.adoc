@@ -36,6 +36,21 @@ environment in `sim/link/codec/`, what causes them, and how to fix them.
 |Timecodes are dropped silently when the TX timecode FIFO is full
 |Low
 |Open, found by reading the code
+
+|7
+|TX cannot go above 100 Mbit/s, the spec asks for 200 Mbit/s
+|High, spec gap
+|Open, found by reading the code
+
+|8
+|Start-up rate is 9.09 Mbit/s instead of 10 Mbit/s
+|Low
+|Open, found by reading the code
+
+|9
+|RX samples a 200 Mbit/s stream only once per bit
+|High, spec gap
+|Open, found by reading the code
 |===
 
 == How to reproduce
@@ -237,6 +252,64 @@ the host writes them faster than that for a while.
 
 *Fix.* Export the full flag to the host interface, or document that the
 host must not write timecodes faster than the link sends them.
+
+== 7. TX cannot go above 100 Mbit/s
+
+`docs/internal/spec.adoc` asks for link rates from 2 to 200 Mbit/s. The
+transmitter cannot go faster than 100 Mbit/s, for two reasons that add up:
+
+* `var_clk_divider` makes `clk_tx` by toggling a flip-flop clocked by the
+  200 MHz `clk_ref_tx` (`var_clk_divider.sv:17-19`). It toggles once every
+  `limit + 1` cycles, so a `clk_tx` period is `2 * (limit + 1)` reference
+  cycles. With the smallest limit, 0, that is 100 MHz: a toggling flip-flop
+  needs one input cycle to go high and another to go low.
+* `tx_signal` changes D or S only on `posedge clk_tx`
+  (`tx_signal.sv:15`), and `bit_tick_i` is tied to 1 (`codec.sv:302`), so
+  one bit goes out per `clk_tx` period: 100 Mbit/s at most.
+
+*Proposed fix.* Clock the transmitter directly with `clk_ref_tx` and set
+the rate with a clock enable instead of a divided clock. `tx` already has
+the `bit_tick_i` input for this, and `spec.adoc` describes the same option
+("goes directly to the shift-register and we use register enable
+signals"). A counter pulses `bit_tick_i` once every N cycles of
+`clk_ref_tx`, giving 200/N Mbit/s: 200, 100, 66.7, 50 and so on, and exactly
+10 at N = 20 (which also fixes 8).
+
+This removes `clk_tx`, a clock made from a flip-flop output, which is
+awkward for timing analysis and adds the clock domain that the FCT and
+timecode requests (3b, 5) have to cross. Sending on both edges of a
+100 MHz `clk_tx` would also reach 200 Mbit/s, but makes timing and the
+transmitter harder.
+
+== 8. Start-up rate is 9.09 Mbit/s
+
+`codec.sv:37` computes `DIV_10MHz = REF_TX_FREQ_HZ / (2 * CLK_FREQ) = 10`,
+but as shown in 7 the divider period is `2 * (limit + 1)` cycles, so the
+start-up `clk_tx` is 200 MHz / 22 = 9.09 MHz. The standard asks for
+10 Mbit/s +- 1 Mbit/s during initialization, so this is inside the
+tolerance, but only by 0.09 Mbit/s.
+
+*Fix.* `DIV_10MHz = REF_TX_FREQ_HZ / (2 * CLK_FREQ) - 1`, and the same
+`- 1` wherever `div_counter_tx` values are chosen for a given rate.
+Fix 7 also removes the problem.
+
+== 9. RX samples a 200 Mbit/s stream only once per bit
+
+`rx_signal` samples D and S with the 200 MHz `clk_ref_tx` and detects a bit
+when `D ^ S` differs between two samples (`rx_signal.sv:43`). At
+200 Mbit/s there is an edge every 5 ns, which is one sample per bit:
+every sample must see a new edge, so any skew between D and S or jitter on
+the line makes the receiver miss or double bits. The spec gives the
+receiver up to 200 MHz for the recovered clock.
+
+Receiving 200 Mbit/s needs either a faster sampling clock (or sampling on
+both edges), or recovering the clock from `D ^ S` as `spec.adoc`
+describes (`rx_recovered_clk`) and moving the data into the system domain
+through an asynchronous FIFO.
+
+No test runs the link above 10 Mbit/s yet, so 7 to 9 are not covered by
+simulation. The DS monitor has no rate limit (it is event driven), so the
+testbench can check them once a test speeds up the link after start-up.
 
 == Testbench notes
 
