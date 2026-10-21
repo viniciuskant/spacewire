@@ -213,7 +213,7 @@ module codec #(
 
     assign wrst_n_sync = wrst_n_sync_ff[1];
 
-    fifo1 #(.DSIZE(DSIZE), .ASIZE(ASIZE)) u_fifo_sync_rx(  
+    async_fifo #(.DSIZE(DSIZE), .ASIZE(ASIZE)) u_fifo_sync_rx(  
         .wfull(), // TODO colocar isso no teste, se der alto sinalizar erro
         .rempty(rd_empty_fifo_sync),
         .wdata(wr_data_fifo_sync),
