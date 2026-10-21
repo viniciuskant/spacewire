@@ -1,6 +1,7 @@
 export PROJECT_ROOT=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 
 export RTL_DIR="$PROJECT_ROOT/rtl"
+export TESTS_DIR="$PROJECT_ROOT/tests"
 export VERIF_DIR="$PROJECT_ROOT/verif"
 export CONSTRAINTS_DIR="$PROJECT_ROOT/common/constraints"
 export PDK_CONFIG="$PROJECT_ROOT/common/pdk"
