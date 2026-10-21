@@ -21,3 +21,13 @@ set TCL_PG_CREATION_FILE  ""
 set TIE_LIB_CELL_PATTERN_LIST "*/TIE*"
 
 set NDM_DESIGN_LIB "codec.dlib"
+
+# sram
+set SRAM_DB_DIR      "${PDK_BASE}/lib/sram/db_nldm"
+set SRAM_VERILOG_DIR "${PDK_BASE}/lib/sram/verilog"
+
+set SRAM_DB_MAX "${SRAM_DB_DIR}/saed32sram_ss0p95v25c.db"
+set SRAM_DB_MIN "${SRAM_DB_DIR}/saed32sram_ff1p16v25c.db"
+set SRAM_DB_TYP "${SRAM_DB_DIR}/saed32sram_tt1p05v25c.db"
+
+set SRAM_VERILOG [list "${SRAM_VERILOG_DIR}/saed32sram.v"]

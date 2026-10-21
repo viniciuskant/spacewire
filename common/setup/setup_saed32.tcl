@@ -1,5 +1,5 @@
 # PDK SETUP
-source "${PDK_DIR}/saed32/hvt.tcl"
+source "${PDK_CONFIG}/saed32/hvt.tcl"
 
 set LIBRARY_FILES "${NDM_REFERENCE_LIB_DIRS}"
 
@@ -11,6 +11,8 @@ lappend search_path "${TARGET_LIBRARY}"
 # library settings
 set target_library $TARGET_LIBRARY
 set synthetic_library "dw_foundation.sldb"
+
+set sram_libraries $SRAM_DB_MAX
 set iopad_library "${LIB_IO_PATH}/saed32io_wb_tt1p05v25c_2p5v.db"
 
-set_app_var link_library "* $target_library $synthetic_library $iopad_library"
+set_app_var link_library "* $target_library $synthetic_library $sram_libraries $iopad_library"

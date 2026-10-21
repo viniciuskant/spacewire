@@ -3,7 +3,7 @@ export PROJECT_ROOT=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 export RTL_DIR="$PROJECT_ROOT/rtl"
 export VERIF_DIR="$PROJECT_ROOT/verif"
 export CONSTRAINTS_DIR="$PROJECT_ROOT/common/constraints"
-export PDK_DIR="$PROJECT_ROOT/common/pdk"
+export PDK_CONFIG="$PROJECT_ROOT/common/pdk"
 export SETUP_DIR="$PROJECT_ROOT/common/setup"
 
 export TOOLS_DIR="$PROJECT_ROOT/tools"
@@ -13,7 +13,7 @@ export FM_DIR="${TOOLS_DIR}/dc/fm"
 export VCS_DIR="${TOOLS_DIR}/dc/vcs"
 
 
-export PDK_MACRO=SAED90   # or SAED32, or IHP130
+export PDK_MACRO=SAED32   # or SAED90, or IHP130
 export TOP_MODULE_NAME="codec"
 
 ### MODULES

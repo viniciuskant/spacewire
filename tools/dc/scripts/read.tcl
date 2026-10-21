@@ -22,14 +22,16 @@ set verilogout_show_unconnected_pins true
 # Verilog
 set v_files [split [exec find $RTL_DIR -name "*.sv"] "\n"]
 
-# Cria uma lista Tcl válida com as variáveis expandidas
-set sram_models [list \
-    "${PDK_DIR}/saed90/MEMORIE/verilog/SRAM16x16.v" \
-    "${PDK_DIR}/saed90/MEMORIE/verilog/SRAM16x64.v" \
-]
-
-foreach f $sram_models {
-    analyze -format verilog $f
+#sram
+if { $PDK_MACRO eq "SAED90" } {
+    analyze -format verilog {
+        "${PDK_BASE}/saed90/MEMORIE/verilog/SRAM16x16.v"
+        "${PDK_BASE}/saed90/MEMORIE/verilog/SRAM16x64.v"
+    }
+} elseif { $PDK_MACRO eq "SAED32" } {
+    analyze -format verilog "${PDK_BASE}/lib/sram/verilog/saed32sram.v"
+} else {
+    puts "WARNING: Nenhum modelo Verilog de SRAM definido para o PDK '$PDK_MACRO'."
 }
 
 if {[llength $v_files] > 0} {

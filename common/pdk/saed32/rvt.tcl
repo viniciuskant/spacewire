@@ -1,6 +1,6 @@
-set PDK_DIR $::env(PDK_DIR)
+set PDK_CONFIG $::env(PDK_CONFIG)
 
-source "${PDK_DIR}/saed32/common.tcl"
+source "${PDK_CONFIG}/saed32/common.tcl"
 
 set LIB_PATH "${PDK_BASE}/lib/stdcell_rvt/"
 set DB_PATH "${PDK_BASE}/lib/stdcell_rvt/db_nldm"
