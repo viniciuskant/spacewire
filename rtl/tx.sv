@@ -19,7 +19,6 @@ module tx(
     input logic send_timecode_i,
     input logic [7:0] timecode_i
 );
-    logic send_data;
     logic busy_char;
     logic busy;
 
@@ -53,32 +52,7 @@ module tx(
 
     assign rd_en_fifo = rd_en_cond & ~rd_en_cond_d;
 
-    logic [8:0] data_reg;
-    logic data_valid;
-
-    always_ff @(posedge clk_tx or negedge rst_n) begin
-        if (!rst_n) begin
-            data_reg <= '0;
-            data_valid <= 1'b0;
-        end else begin
-            if (rd_en_fifo) begin
-                data_reg <= rd_data_fifo;
-                data_valid <= 1'b1;
-            end else if (busy_char) begin
-                data_valid <= 1'b0;
-            end
-        end
-    end
-
-    assign send_data = run_state & data_valid;
-
-    logic busy_char_d;
-    always_ff @(posedge clk_tx or negedge rst_n) begin
-        if (!rst_n) busy_char_d <= 1'b0;
-        else busy_char_d <= busy_char;
-    end
-
-    assign tc_fifo_rinc = busy_char & ~busy_char_d & ~tc_fifo_rempty;
+    assign tc_fifo_rinc = !busy_char & ~tc_fifo_rempty;
 
     logic bit_valid;
     logic bit_signal;
@@ -96,8 +70,8 @@ module tx(
         .clk(clk_tx),
         .rst_n(rst_n),
         .bit_tick_i(bit_tick_i),
-        .send_data_i(send_data),
-        .data_i(data_reg),
+        .send_data_i(rd_en_cond),
+        .data_i(rd_data_fifo),
         .busy_o(busy_char),
         .send_fct_i(send_fct_i),
         .send_null_i(send_null_i),

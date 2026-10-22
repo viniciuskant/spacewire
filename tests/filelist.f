@@ -20,8 +20,6 @@ ${RTL_DIR}/rx_signal.sv
 ${RTL_DIR}/tx.sv
 ${RTL_DIR}/tx_char.sv
 ${RTL_DIR}/tx_signal.sv
-${RTL_DIR}/rx_fifo.sv
-${RTL_DIR}/tx_fifo.sv
 ${RTL_DIR}/cdc_sync.sv
 ${RTL_DIR}/spw_char_decode.sv
 

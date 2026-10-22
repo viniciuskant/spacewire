@@ -52,39 +52,37 @@ module codec #(
     logic wr_en_fifo_rx, rd_en_fifo_tx, rd_en_fifo_tx_temp, empty_tx_fifo, empty_tx_fifo_temp;
 
     logic credit_err;
-    logic [$clog2(DEPTH_FIFO+1)-1:0] free_slots_fifo_rx, free_slots_fifo_tx;
+    logic [$clog2(DEPTH_FIFO)-1:0] free_slots_fifo_rx;
 
 
-    rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_rx_fifo (
-        .wr_clk_i(clk_system),
-        .rd_clk_i(clk_system), //TODO verificar se o clock da fifo é o clock do sistema
+    sync_fifo #(.DSIZE(DATA_WIDTH_FIFO), .ASIZE($clog2(DEPTH_FIFO))) u_rx_fifo(  
+        .clk(clk_system),
         .rst_n(rst_n),
 
-        .wr_data_i(wr_data_fifo_rx),
-        .wr_en_i(wr_en_fifo_rx),
+        .wdata(wr_data_fifo_rx),
+        .winc(wr_en_fifo_rx),
 
         // saída do módulo
-        .rd_en_i(SpW_Packet_RX_en),
-        .rd_data_o(SpW_Packet_RX),
-        .empty_o(empty_rx_fifo),
+        .rinc(SpW_Packet_RX_en),
+        .rdata(SpW_Packet_RX),
+        .rempty(empty_rx_fifo),
         .free_space_o(free_slots_fifo_rx)
     );
 
     assign credit_err = (free_slots_fifo_rx == '0) & wr_en_fifo_rx;
-    assign full_tx_fifo = free_slots_fifo_tx == '0;
 
-    rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_tx_fifo (
-        .wr_clk_i(clk_system),
-        .rd_clk_i(clk_tx),
-        .rst_n(rst_n), // TODO ver a questão de cdc
-
-        .wr_data_i(SpW_Packet_TX),
-        .wr_en_i(SpW_Packet_TX_en),
-
-        .rd_en_i(rd_en_fifo_tx_temp),
-        .rd_data_o(rd_data_fifo_tx_temp),
-        .empty_o(empty_tx_fifo_temp),
-        .free_space_o(free_slots_fifo_tx)
+    async_fifo #(.DSIZE(DATA_WIDTH_FIFO), .ASIZE($clog2(DEPTH_FIFO))) u_tx_fifo(  
+        .wfull(full_tx_fifo),
+        .wdata(SpW_Packet_TX),
+        .winc(SpW_Packet_TX_en), 
+        .wclk(clk_system),
+        .wrst_n(rst_n),
+        
+        .rempty(empty_tx_fifo_temp),
+        .rdata(rd_data_fifo_tx_temp),
+        .rinc(rd_en_fifo_tx_temp),
+        .rclk(clk_tx),
+        .rrst_n(rst_n)  // TODO ver a questão de cdc
     );
 
     // Módulo para lisar com os erros, colocando EEP no final e esvaziando até o EOP
