@@ -160,7 +160,8 @@ package ds_monitor_pkg;
         payload[tx_path][n - 2] = d; // data, LSB first
       nbits[tx_path] = n + 1;
 
-      if (nbits[tx_path] == (char_flag[tx_path] ? 4 : 10) && nbits[tx_path] > 2)
+      // char_flag is only valid from the second bit on
+      if (nbits[tx_path] == (char_flag[tx_path] ? 4 : 10))
         publish_char(tx_path);
     endfunction
 
