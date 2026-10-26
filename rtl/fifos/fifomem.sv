@@ -11,28 +11,28 @@
 //=============================================================================
 
 module fifomem #(
-    parameter DATASIZE = 8, // Memory data word width
-    parameter ADDRSIZE = 4  // Number of mem address bits
+    parameter DSIZE = 8, // Memory data word width
+    parameter ASIZE = 4  // Number of mem address bits
 )(
-    output [DATASIZE-1:0] rdata,
-    input [DATASIZE-1:0] wdata,
-    input [ADDRSIZE-1:0] waddr, raddr,
+    output [DSIZE-1:0] rdata,
+    input [DSIZE-1:0] wdata,
+    input [ASIZE-1:0] waddr, raddr,
     input wclken, wfull, wclk,
     input rclken, rclk
 );
 
 `ifdef SAED90
     generate
-        if (ADDRSIZE <= 4) begin : g_sram16x16
+        if (ASIZE <= 4) begin : g_sram16x16
             logic [15:0] wdata_pad;
             logic [15:0] rdata_full;
             logic [3:0]  waddr_pad, raddr_pad;
             logic [15:0] unused_o1;
 
-            assign wdata_pad = {{(16-DATASIZE){1'b0}}, wdata};
-            assign waddr_pad = {{(4-ADDRSIZE){1'b0}}, waddr};
-            assign raddr_pad = {{(4-ADDRSIZE){1'b0}}, raddr};
-            assign rdata     = rdata_full[DATASIZE-1:0];
+            assign wdata_pad = {{(16-DSIZE){1'b0}}, wdata};
+            assign waddr_pad = {{(4-ASIZE){1'b0}}, waddr};
+            assign raddr_pad = {{(4-ASIZE){1'b0}}, raddr};
+            assign rdata     = rdata_full[DSIZE-1:0];
 
             SRAM16x16 mem (
                 // Port 1: Write
@@ -50,16 +50,16 @@ module fifomem #(
                 .I2(16'b0), 
                 .O2(rdata_full)
             );
-        end else if (ADDRSIZE <= 6) begin : g_sram16x64
+        end else if (ASIZE <= 6) begin : g_sram16x64
             logic [15:0] wdata_pad;
             logic [15:0] rdata_full;
             logic [5:0]  waddr_pad, raddr_pad;
             logic [15:0] unused_o1;
 
-            assign wdata_pad = {{(16-DATASIZE){1'b0}}, wdata};
-            assign waddr_pad = {{(6-ADDRSIZE){1'b0}}, waddr};
-            assign raddr_pad = {{(6-ADDRSIZE){1'b0}}, raddr};
-            assign rdata     = rdata_full[DATASIZE-1:0];
+            assign wdata_pad = {{(16-DSIZE){1'b0}}, wdata};
+            assign waddr_pad = {{(6-ASIZE){1'b0}}, waddr};
+            assign raddr_pad = {{(6-ASIZE){1'b0}}, raddr};
+            assign rdata     = rdata_full[DSIZE-1:0];
 
             SRAM16x64 mem (
                 // Port 1: Write
@@ -81,16 +81,16 @@ module fifomem #(
     endgenerate
 `elsif SAED32
     generate
-        if (ADDRSIZE <= 4) begin : g_sram16x16
+        if (ASIZE <= 4) begin : g_sram16x16
             logic [15:0] wdata_pad;
             logic [15:0] rdata_full;
             logic [3:0]  waddr_pad, raddr_pad;
             logic [15:0] unused_o1;
 
-            assign wdata_pad = {{(16-DATASIZE){1'b0}}, wdata};
-            assign waddr_pad = {{(4-ADDRSIZE){1'b0}}, waddr};
-            assign raddr_pad = {{(4-ADDRSIZE){1'b0}}, raddr};
-            assign rdata     = rdata_full[DATASIZE-1:0];
+            assign wdata_pad = {{(16-DSIZE){1'b0}}, wdata};
+            assign waddr_pad = {{(4-ASIZE){1'b0}}, waddr};
+            assign raddr_pad = {{(4-ASIZE){1'b0}}, raddr};
+            assign rdata     = rdata_full[DSIZE-1:0];
 
             SRAM2RW16x16 mem (
                 // Port 1: Write
@@ -111,16 +111,16 @@ module fifomem #(
                 .O2(rdata_full)
             );
             
-        end else if (ADDRSIZE <= 6) begin : g_sram16x64
+        end else if (ASIZE <= 6) begin : g_sram16x64
             logic [15:0] wdata_pad;
             logic [15:0] rdata_full;
             logic [5:0]  waddr_pad, raddr_pad;
             logic [15:0] unused_o1;
 
-            assign wdata_pad = {{(16-DATASIZE){1'b0}}, wdata};
-            assign waddr_pad = {{(6-ADDRSIZE){1'b0}}, waddr};
-            assign raddr_pad = {{(6-ADDRSIZE){1'b0}}, raddr};
-            assign rdata     = rdata_full[DATASIZE-1:0];
+            assign wdata_pad = {{(16-DSIZE){1'b0}}, wdata};
+            assign waddr_pad = {{(6-ASIZE){1'b0}}, waddr};
+            assign raddr_pad = {{(6-ASIZE){1'b0}}, raddr};
+            assign rdata     = rdata_full[DSIZE-1:0];
 
             SRAM2RW16x64 mem (
                 // Port 1: Write
@@ -146,8 +146,8 @@ module fifomem #(
 `else
 
     // RTL Verilog memory model
-    localparam DEPTH = 1<<ADDRSIZE;
-    logic [DATASIZE-1:0] mem [0:DEPTH-1];
+    localparam DEPTH = 1<<ASIZE;
+    logic [DSIZE-1:0] mem [0:DEPTH-1];
 
     assign rdata = mem[raddr];
     always_ff @(posedge wclk) begin

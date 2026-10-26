@@ -20,10 +20,10 @@ module codec #(
     output D_out,
 
     //matrix de roteamento
-    input [8:0] SpW_Packet_TX, 
+    input [DATA_WIDTH_FIFO-1:0] SpW_Packet_TX, 
     input SpW_Packet_TX_en,
     output full_tx_fifo,
-    output [8:0] SpW_Packet_RX,
+    output [DATA_WIDTH_FIFO-1:0] SpW_Packet_RX,
     input SpW_Packet_RX_en,
     output empty_rx_fifo,
 
@@ -52,7 +52,7 @@ module codec #(
     logic wr_en_fifo_rx, rd_en_fifo_tx, rd_en_fifo_tx_temp, empty_tx_fifo, empty_tx_fifo_temp;
 
     logic credit_err;
-    logic [$clog2(DEPTH_FIFO)-1:0] free_slots_fifo_rx;
+    logic [$clog2(DEPTH_FIFO):0] free_slots_fifo_rx;
 
 
     sync_fifo #(.DSIZE(DATA_WIDTH_FIFO), .ASIZE($clog2(DEPTH_FIFO))) u_rx_fifo(  

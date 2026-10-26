@@ -20,10 +20,10 @@ module sync_fifo #(
     logic [PTR_WIDTH-1:0] wr_ptr, rd_ptr;
     logic empty;
 
-    wire [ASIZE-1:0] wr_addr = wr_ptr[ASIZE-1:0];
-    wire [ASIZE-1:0] rd_addr = rd_ptr[ASIZE-1:0];
+    wire [ASIZE:0] wr_addr = wr_ptr[ASIZE:0];
+    wire [ASIZE:0] rd_addr = rd_ptr[ASIZE:0];
 
-    fifomem #(DSIZE, ASIZE) fifomem (
+    fifomem #(.DSIZE(DSIZE), .ASIZE(ASIZE)) fifomem (
         .rdata (rdata),
         .wdata (wdata),
         .waddr (wr_addr),

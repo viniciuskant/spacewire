@@ -22,14 +22,14 @@ module async_fifo #(
     input winc, wclk, wrst_n,
     input rinc, rclk, rrst_n
 );
-    logic [ASIZE-1:0] waddr, raddr;
+    logic [ASIZE:0] waddr, raddr;
     logic [ASIZE:0] wptr, rptr, wq2_rptr, rq2_wptr;
 
     // cdc
     sync_r2w sync_r2w (.wq2_rptr(wq2_rptr), .rptr(rptr), .wclk(wclk), .wrst_n(wrst_n));
     sync_w2r sync_w2r (.rq2_wptr(rq2_wptr), .wptr(wptr), .rclk(rclk), .rrst_n(rrst_n));
 
-    fifomem #(DSIZE, ASIZE) fifomem (
+    fifomem #(.DSIZE(DSIZE), .ASIZE(ASIZE)) fifomem (
         .rdata(rdata),
         .wdata(wdata),
         .waddr(waddr), 
