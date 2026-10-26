@@ -1,0 +1,327 @@
+= Codec RTL: Bugs Found by the UVM Testbench
+
+This page lists the problems in `rtl/` found while bringing up the UVM
+environment in `sim/link/codec/`, what causes them, and how to fix them.
+
+[cols="1,3,1,2"]
+|===
+|# |Problem |Severity |Status
+
+|1
+|Link state machine timeouts are 5x too short
+|High
+|Fixed in `b05b946`
+
+|2
+|`got_bit`, `parity_err` and `escape_err` are lost crossing into `clk_system`
+|High, blocks Run
+|Fix proposed and tested on a copy
+
+|3
+|The DUT stops sending FCTs, so the partner runs out of credit
+|High, blocks traffic into the DUT
+|Open, needs a design decision
+
+|4
+|`EEP_MARKER` in `error_cleanup_fsm` holds the EOP word
+|To check
+|Open
+
+|5
+|Timecodes can be sent before Run
+|Medium
+|Open, found by reading the code
+
+|6
+|Timecodes are dropped silently when the TX timecode FIFO is full
+|Low
+|Open, found by reading the code
+
+|7
+|TX cannot go above 100 Mbit/s, the spec asks for 200 Mbit/s
+|High, spec gap
+|Open, found by reading the code
+
+|8
+|Start-up rate is 9.09 Mbit/s instead of 10 Mbit/s
+|Low
+|Open, found by reading the code
+
+|9
+|RX samples a 200 Mbit/s stream only once per bit
+|High, spec gap
+|Open, found by reading the code
+|===
+
+== How to reproduce
+
+From `tools/verilator/` (see `tools/verilator/Makefile`):
+
+----
+make codec TEST=codec_smoke_test      # 1: link start-up timing
+make codec TEST=codec_link_up_test    # 2: link drops 850 ns after reaching Run
+make codec TEST=codec_packet_test     # 3: traffic into the DUT stops
+----
+
+`codec_smoke_test` passes on the current RTL. `codec_link_up_test` and
+`codec_packet_test` fail until 2 and 3 are fixed.
+
+== 1. Link state machine timeouts are 5x too short (fixed)
+
+*Symptom.* With a silent link partner, the DUT sent its first NULL 5.06 us
+after reset instead of 19.2 us (ErrorReset 6.4 us + ErrorWait 12.8 us), and
+restarted every 6.49 us instead of every 32 us.
+
+*Cause.*
+
+* `codec.sv` passed `CLK_FREQ`, the 10 MHz link rate, to `state_machine`,
+  which runs on `clk_system` (50 MHz). `T_6_4US_CYCLES` and `T_12_8US_CYCLES`
+  came out as 64 and 128 cycles, which is 1.28 us and 2.56 us at 50 MHz.
+* With the right frequency, 12.8 us is 640 cycles, and `timer_us_cnt` was
+  only 8 bits (maximum 255).
+* `CLK_FREQ * 128` overflows `int` for a 50 MHz clock.
+
+*Fix (`b05b946`).* `state_machine` gets `SYS_CLK_FREQ_HZ`, `timer_us_cnt` is
+16 bits wide, and the cycle counts are computed as `longint`.
+`codec_smoke_test` now measures 20.46 us to the first NULL and 32.01 us
+between restarts. `tests/tb_codec.sv` still passes.
+
+== 2. Pulses lost crossing from `clk_ref_tx` to `clk_system`
+
+*Symptom.* The link reaches Run and the DUT resets it exactly 850 ns later
+(`DISCONNECT_TIMEOUT_NS`), even though the partner is sending without a gap.
+It happens on every link-up.
+
+*Cause.* `rx_char` runs on `clk_ref_tx` (200 MHz). Its `got_bit_o`,
+`parity_err_o` and `escape_err_o` are pulses one `clk_ref_tx` cycle long
+(5 ns). `codec.sv:183-199` passes them to `clk_system` (20 ns period) through
+a plain two flip-flop `cdc_sync`. That only catches a pulse when a
+`clk_system` edge lands inside its 5 ns.
+
+At 10 Mbit/s a bit lasts exactly 20 `clk_ref_tx` cycles, or 5 `clk_system`
+cycles, so the phase never changes and the pulse is missed every time.
+Counting both sides of the synchronizer during start-up gave 29, 50 and 79
+`got_bit` pulses at 200 MHz and 0 after `cdc_sync`. The disconnect counter
+only runs in Run, so the link drops 850 ns after entering it.
+
+`tests/tb_codec.sv` most likely passes because it runs the link at 50 Mbit/s
+in Run (`div_counter_tx = 2`), where pulses come often enough that some of
+them line up with a `clk_system` edge. On hardware the clocks are not locked
+together, so the result would be random.
+
+The same problem hits `parity_err` and `escape_err`, so the DUT can also
+miss real parity and escape errors.
+
+*Proposed fix.* Stretch each pulse in the `clk_ref_tx` domain to at least two
+`clk_system` cycles, then synchronize the stretched level. For `got_bit` a
+level is what the disconnect counter needs anyway ("bits are arriving"), and
+for the errors a few cycles of `rx_Error` only send the state machine to
+ErrorReset once.
+
+[source,systemverilog]
+----
+// os pulsos de clk_ref_tx duram 1 ciclo (5 ns) e o cdc_sync em clk_system
+// (20 ns) quase nunca os enxerga: estica para 2 ciclos de clk_system antes
+localparam int STRETCH = 2 * REF_TX_FREQ_HZ / SYS_CLK_FREQ_HZ;
+logic [STRETCH-1:0] got_bit_sh, parity_err_sh, escape_err_sh;
+always_ff @(posedge clk_ref_tx or negedge rst_n_rx) begin
+    if (!rst_n_rx) begin
+        got_bit_sh <= '0;
+        parity_err_sh <= '0;
+        escape_err_sh <= '0;
+    end else begin
+        got_bit_sh <= {got_bit_sh[STRETCH-2:0], got_bit_clk_ref_tx};
+        parity_err_sh <= {parity_err_sh[STRETCH-2:0], parity_err_clk_ref_tx};
+        escape_err_sh <= {escape_err_sh[STRETCH-2:0], escape_err_clk_ref_tx};
+    end
+end
+
+// and the three cdc_sync instances take |got_bit_sh, |parity_err_sh and
+// |escape_err_sh instead of the raw pulses
+----
+
+With this change on a copy of `rtl/`, `codec_link_up_test` passes: the link
+comes up 21.12 us after reset and stays in Run for the whole 200 us of the
+test. It is not applied to `rtl/` yet.
+
+== 3. The DUT stops granting credit
+
+*Symptom.* Traffic from the DUT to the partner works, but traffic from the
+partner to the DUT stops after 8 characters. The partner then waits forever
+with 0 credit. In `codec_packet_test` (run with fix 2 applied) host -> wire
+checked 7/7 packets and 13/13 timecodes, and wire -> host stopped after 1
+packet.
+
+A trace of the DUT showed it sent one FCT (in Connecting), wrote the 8
+characters it allowed into its RX FIFO, had all 8 read by the host, and then
+never raised `send_fct_fc` again while in Run.
+
+There are three separate problems in the FCT path.
+
+=== 3a. Port too narrow for the free-slot count
+
+`codec.sv:54` declares `free_slots_fifo_rx` as `$clog2(DEPTH_FIFO+1)` bits
+(7 bits for a 64-deep FIFO, so it can hold 64). `flow_control.sv:14` and
+`flow_control_rx.sv:9` declare the port as `$clog2(DEPTH_FIFO)` bits
+(6 bits). An empty FIFO (64 free, `7'b100_0000`) arrives as 0, so
+`free_slots_fifo >= FCT_GRANT` (`flow_control_rx.sv:19-20`) is false and no
+FCT is ever sent while the FIFO is empty.
+
+Since the host normally reads the RX FIFO right away, the FIFO is almost
+always empty, which is why the link deadlocks.
+
+*Fix.* Declare the port, and the `credits` counter it is compared with, as
+`[$clog2(DEPTH_FIFO+1)-1:0]` in both `flow_control.sv` and
+`flow_control_rx.sv`.
+
+=== 3b. No handshake between the credit counter and the transmitter
+
+`flow_control_rx` adds `FCT_GRANT` (8) to `credits` on every `clk_system`
+cycle that `send_FCT` is high (`flow_control_rx.sv:29`). But `send_FCT` is
+a level that `tx_char` samples in the `clk_tx` domain (10 MHz at start-up),
+and only when it is idle between characters. Nothing tells `flow_control_rx`
+how many FCTs actually went out. `tx.char_ack_o` exists but is not connected
+in `codec.sv`.
+
+So with 3a fixed:
+
+* After reset, `send_FCT` stays high for 7 `clk_system` cycles (140 ns)
+  while `credits` goes 0 -> 56. `tx_char` sends one or two FCTs in that time,
+  so the partner gets 8 or 16 credits while the DUT believes it gave 56.
+* After that, a new FCT is wanted only when `credits` drops to 48, and
+  `send_FCT` is then high for a single `clk_system` cycle (20 ns), which
+  `tx_char` can miss in the same way as problem 2.
+
+The credit the DUT believes it granted and the FCTs actually on the wire
+drift apart, and the link either slows down or stalls.
+
+*Possible fix.* Make the FCT a request/acknowledge pair across the two
+clock domains. `flow_control_rx` raises a request and holds it. `tx_char`
+sends one FCT and acknowledges it (through a synchronizer, using
+`char_ack_o` or a dedicated FCT acknowledge). `credits` grows by 8 only on
+the acknowledge, and the next request is raised only after that. This is a
+design change and needs a decision from the owner of the flow control.
+
+=== 3c. FCTs sent in Connecting are not counted
+
+`state_machine.sv:186` raises `send_FCT` for the whole of Connecting, and
+`codec.sv:114` ORs it into the transmitter's FCT request. But
+`flow_control_rx` holds `credits` at 0 until `run_state`. The FCT (or FCTs)
+sent in Connecting are not counted, so once in Run the DUT can grant 56
+more on top of them: 64 outstanding, more than the 56 the standard allows.
+The partner checks for this and would report a credit error.
+
+*Fix.* Count the Connecting FCT in `flow_control_rx`, or let
+`flow_control_rx` send it, so that a single counter covers every FCT the
+DUT sends. Fix 3b's acknowledge makes this straightforward.
+
+== 4. `EEP_MARKER` holds the EOP word
+
+`error_cleanup_fsm.sv:17` defines `EEP_MARKER = 9'b1_0000_0010`. Everywhere
+else in the codec that word is an EOP: the RX path writes
+`{1'b1, 6'b0, 2'b10}` for EOP (`codec.sv`, `wr_data_fifo_rx`), and
+`tx_char` sends `[1:0] = 2'b10` as EOP. The EEP word is `9'b1_0000_0001`.
+
+The module's comment says it adds an EEP at the end and drains until the
+EOP, so the value may be right and only the name wrong. If it really should
+be an EEP, the comparison at line 71 is wrong. This needs a look from the
+owner of the module. No test covers it yet.
+
+== 5. Timecodes can be sent before Run
+
+`tx.sv` feeds `send_timecode_i(~tc_fifo_rempty)` to `tx_char`, and
+`tx_char` (`ST_IDLE`, line 68) gives timecodes the highest priority without
+looking at `run_state`. The transmitter is out of reset in Started and
+Connecting, so a timecode the host writes before the link is up is sent
+during start-up. The standard only allows timecodes in Run.
+
+The test sequences wait for the link before sending timecodes, so no test
+hits this yet. The partner in `ds_partner.sv` reports a timecode outside
+Run as an error.
+
+*Fix.* Only take timecodes in `tx_char` while `run_state` is high (it is
+already used for data), or hold `tc_fifo_rinc` until then.
+
+== 6. Timecodes dropped when the timecode FIFO is full
+
+`tx.sv` writes timecodes into a 16-entry `fifo1` (`u_tc_fifo`) with
+`winc(send_timecode_i)` and leaves `tc_fifo_wfull` unconnected. A timecode
+written while the FIFO is full is dropped, and the host has no way to know.
+At 10 Mbit/s a timecode takes 1.4 us on the wire, so this only happens if
+the host writes them faster than that for a while.
+
+*Fix.* Export the full flag to the host interface, or document that the
+host must not write timecodes faster than the link sends them.
+
+== 7. TX cannot go above 100 Mbit/s
+
+`docs/internal/spec.adoc` asks for link rates from 2 to 200 Mbit/s. The
+transmitter cannot go faster than 100 Mbit/s, for two reasons that add up:
+
+* `var_clk_divider` makes `clk_tx` by toggling a flip-flop clocked by the
+  200 MHz `clk_ref_tx` (`var_clk_divider.sv:17-19`). It toggles once every
+  `limit + 1` cycles, so a `clk_tx` period is `2 * (limit + 1)` reference
+  cycles. With the smallest limit, 0, that is 100 MHz: a toggling flip-flop
+  needs one input cycle to go high and another to go low.
+* `tx_signal` changes D or S only on `posedge clk_tx`
+  (`tx_signal.sv:15`), and `bit_tick_i` is tied to 1 (`codec.sv:302`), so
+  one bit goes out per `clk_tx` period: 100 Mbit/s at most.
+
+*Proposed fix.* Clock the transmitter directly with `clk_ref_tx` and set
+the rate with a clock enable instead of a divided clock. `tx` already has
+the `bit_tick_i` input for this, and `spec.adoc` describes the same option
+("goes directly to the shift-register and we use register enable
+signals"). A counter pulses `bit_tick_i` once every N cycles of
+`clk_ref_tx`, giving 200/N Mbit/s: 200, 100, 66.7, 50 and so on, and exactly
+10 at N = 20 (which also fixes 8).
+
+This removes `clk_tx`, a clock made from a flip-flop output, which is
+awkward for timing analysis and adds the clock domain that the FCT and
+timecode requests (3b, 5) have to cross. Sending on both edges of a
+100 MHz `clk_tx` would also reach 200 Mbit/s, but makes timing and the
+transmitter harder.
+
+== 8. Start-up rate is 9.09 Mbit/s
+
+`codec.sv:37` computes `DIV_10MHz = REF_TX_FREQ_HZ / (2 * CLK_FREQ) = 10`,
+but as shown in 7 the divider period is `2 * (limit + 1)` cycles, so the
+start-up `clk_tx` is 200 MHz / 22 = 9.09 MHz. The standard asks for
+10 Mbit/s +- 1 Mbit/s during initialization, so this is inside the
+tolerance, but only by 0.09 Mbit/s.
+
+*Fix.* `DIV_10MHz = REF_TX_FREQ_HZ / (2 * CLK_FREQ) - 1`, and the same
+`- 1` wherever `div_counter_tx` values are chosen for a given rate.
+Fix 7 also removes the problem.
+
+== 9. RX samples a 200 Mbit/s stream only once per bit
+
+`rx_signal` samples D and S with the 200 MHz `clk_ref_tx` and detects a bit
+when `D ^ S` differs between two samples (`rx_signal.sv:43`). At
+200 Mbit/s there is an edge every 5 ns, which is one sample per bit:
+every sample must see a new edge, so any skew between D and S or jitter on
+the line makes the receiver miss or double bits. The spec gives the
+receiver up to 200 MHz for the recovered clock.
+
+Receiving 200 Mbit/s needs either a faster sampling clock (or sampling on
+both edges), or recovering the clock from `D ^ S` as `spec.adoc`
+describes (`rx_recovered_clk`) and moving the data into the system domain
+through an asynchronous FIFO.
+
+No test runs the link above 10 Mbit/s yet, so 7 to 9 are not covered by
+simulation. The DS monitor has no rate limit (it is event driven), so the
+testbench can check them once a test speeds up the link after start-up.
+
+== Testbench notes
+
+These are limits of the testbench, not RTL bugs, but they matter when
+reading results:
+
+* When the DUT resets its link, `tx_signal` forces D and S to 0. If that
+  cuts a character short, the change to 0 reads as one extra 0 bit, and the
+  last character can decode as something else (an ESC cut after 3 bits
+  looks like an EEP). `codec_smoke_test` does not check the last character
+  of a burst, and the scoreboard ignores wire characters outside Run.
+* A partner timecode can wait behind a data character that is waiting for
+  credit, because both go through the same sequencer (`ds0.s0`). A real
+  codec has a separate path for timecodes. This shows up in
+  `codec_packet_test` while problem 3 is open.

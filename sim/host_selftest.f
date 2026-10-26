@@ -1,0 +1,11 @@
+../rtl/rx_fifo.sv
+link/host/host_if.sv
+link/host/host_item.sv
+link/host/host_driver.sv
+link/host/host_monitor.sv
+link/host/host_agent.sv
+link/host/host_seq_lib.sv
+link/host/selftest/host_selftest_checker.sv
+link/host/selftest/host_selftest_env.sv
+link/host/selftest/host_selftest_test.sv
+link/host/selftest/host_selftest_top.sv
