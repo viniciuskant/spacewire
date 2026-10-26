@@ -99,31 +99,30 @@ function run_codec_test {
         "${RTL_DIR}/tx.sv" \
         "${RTL_DIR}/tx_char.sv" \
         "${RTL_DIR}/tx_signal.sv" \
-        "${RTL_DIR}/rx_fifo.sv" \
-        "${RTL_DIR}/tx_fifo.sv" \
         "${RTL_DIR}/cdc_sync.sv" \
         "${RTL_DIR}/spw_char_decode.sv" \
-        "${RTL_DIR}/fifo_rx2fifo/rtl/fifo1.sv" \
-        "${RTL_DIR}/fifo_rx2fifo/rtl/fifomem.sv" \
-        "${RTL_DIR}/fifo_rx2fifo/rtl/rptr_empty.sv" \
-        "${RTL_DIR}/fifo_rx2fifo/rtl/sync_r2w.sv" \
-        "${RTL_DIR}/fifo_rx2fifo/rtl/sync_w2r.sv" \
-        "${RTL_DIR}/fifo_rx2fifo/rtl/wptr_full.sv" \
+        "${RTL_DIR}/fifos/async_fifo.sv" \
+        "${RTL_DIR}/fifos/sync_fifo.sv" \
+        "${RTL_DIR}/fifos/fifomem.sv" \
+        "${RTL_DIR}/fifos/rptr_empty.sv" \
+        "${RTL_DIR}/fifos/sync_r2w.sv" \
+        "${RTL_DIR}/fifos/sync_w2r.sv" \
+        "${RTL_DIR}/fifos/wptr_full.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_codec
 }
 
 
 function run_fifo_rx2fifo_test {
-    echo "Executando teste fifo1"
+    echo "Executando teste async_fifo"
     verilator --top-module tb_fifo1 \
-        "${RTL_DIR}/fifo_rx2fifo/tests/tb_fifo1.sv" \
-        "${RTL_DIR}/fifo_rx2fifo/rtl/fifo1.sv" \
-        "${RTL_DIR}/fifo_rx2fifo/rtl/fifomem.sv" \
-        "${RTL_DIR}/fifo_rx2fifo/rtl/rptr_empty.sv" \
-        "${RTL_DIR}/fifo_rx2fifo/rtl/sync_r2w.sv" \
-        "${RTL_DIR}/fifo_rx2fifo/rtl/sync_w2r.sv" \
-        "${RTL_DIR}/fifo_rx2fifo/rtl/wptr_full.sv" \
+        "${TESTS_DIR}/tb_fifo1.sv" \
+        "${RTL_DIR}/async_fifo/async_fifo.sv" \
+        "${RTL_DIR}/async_fifo/fifomem.sv" \
+        "${RTL_DIR}/async_fifo/rptr_empty.sv" \
+        "${RTL_DIR}/async_fifo/sync_r2w.sv" \
+        "${RTL_DIR}/async_fifo/sync_w2r.sv" \
+        "${RTL_DIR}/async_fifo/wptr_full.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_fifo1
 }

@@ -1,6 +1,16 @@
-// https://www.researchgate.net/publication/252160343_Simulation_and_Synthesis_Techniques_for_Asynchronous_FIFO_Design/link/54bfe9ee0cf28eae4a66421c/download?_tp=eyJjb250ZXh0Ijp7ImZpcnN0UGFnZSI6InB1YmxpY2F0aW9uIiwicGFnZSI6InB1YmxpY2F0aW9uIn19
+//=============================================================================
+// Asynchronous FIFO (Clock Domain Crossing) implementation based on:
+//
+// Verilog, Expert & Cummings, Clifford. (2002). 
+// Simulation and Synthesis Techniques for Asynchronous FIFO Design. 
+//
+// Available at: https://www.researchgate.net/publication/252160343_Simulation_and_Synthesis_Techniques_for_Asynchronous_FIFO_Design/link/54bfe9ee0cf28eae4a66421c/download?_tp=eyJjb250ZXh0Ijp7ImZpcnN0UGFnZSI6InB1YmxpY2F0aW9uIiwicGFnZSI6InB1YmxpY2F0aW9uIn19
+//
+// The technique uses Gray-coded pointers and 2-flip-flop synchronizers for
+// safe data/pointer transfer between clock domains.
+//=============================================================================
 
-module fifo1 #(
+module async_fifo #(
     parameter DSIZE = 10,
     parameter ASIZE = 4
 )(  
@@ -12,14 +22,14 @@ module fifo1 #(
     input winc, wclk, wrst_n,
     input rinc, rclk, rrst_n
 );
-    logic [ASIZE-1:0] waddr, raddr;
+    logic [ASIZE:0] waddr, raddr;
     logic [ASIZE:0] wptr, rptr, wq2_rptr, rq2_wptr;
 
     // cdc
     sync_r2w sync_r2w (.wq2_rptr(wq2_rptr), .rptr(rptr), .wclk(wclk), .wrst_n(wrst_n));
     sync_w2r sync_w2r (.rq2_wptr(rq2_wptr), .wptr(wptr), .rclk(rclk), .rrst_n(rrst_n));
 
-    fifomem #(DSIZE, ASIZE) fifomem (
+    fifomem #(.DSIZE(DSIZE), .ASIZE(ASIZE)) fifomem (
         .rdata(rdata),
         .wdata(wdata),
         .waddr(waddr), 

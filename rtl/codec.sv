@@ -20,10 +20,10 @@ module codec #(
     output D_out,
 
     //matrix de roteamento
-    input [8:0] SpW_Packet_TX, 
+    input [DATA_WIDTH_FIFO-1:0] SpW_Packet_TX, 
     input SpW_Packet_TX_en,
     output full_tx_fifo,
-    output [8:0] SpW_Packet_RX,
+    output [DATA_WIDTH_FIFO-1:0] SpW_Packet_RX,
     input SpW_Packet_RX_en,
     output empty_rx_fifo,
 
@@ -38,6 +38,7 @@ module codec #(
 
     logic clk_tx;
     logic [7:0] limit_counter_tx;
+    logic run_state;
     assign limit_counter_tx = run_state ? div_counter_tx : DIV_10MHz;
 
     var_clk_divider u_var_clk_divider (
@@ -51,43 +52,43 @@ module codec #(
     logic wr_en_fifo_rx, rd_en_fifo_tx, rd_en_fifo_tx_temp, empty_tx_fifo, empty_tx_fifo_temp;
 
     logic credit_err;
-    logic [$clog2(DEPTH_FIFO+1)-1:0] free_slots_fifo_rx, free_slots_fifo_tx;
+    logic [$clog2(DEPTH_FIFO):0] free_slots_fifo_rx;
 
 
-    rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_rx_fifo (
-        .wr_clk_i(clk_system),
-        .rd_clk_i(clk_system), //TODO verificar se o clock da fifo é o clock do sistema
+    sync_fifo #(.DSIZE(DATA_WIDTH_FIFO), .ASIZE($clog2(DEPTH_FIFO))) u_rx_fifo(  
+        .clk(clk_system),
         .rst_n(rst_n),
 
-        .wr_data_i(wr_data_fifo_rx),
-        .wr_en_i(wr_en_fifo_rx),
+        .wdata(wr_data_fifo_rx),
+        .winc(wr_en_fifo_rx),
 
         // saída do módulo
-        .rd_en_i(SpW_Packet_RX_en),
-        .rd_data_o(SpW_Packet_RX),
-        .empty_o(empty_rx_fifo),
+        .rinc(SpW_Packet_RX_en),
+        .rdata(SpW_Packet_RX),
+        .rempty(empty_rx_fifo),
         .free_space_o(free_slots_fifo_rx)
     );
 
     assign credit_err = (free_slots_fifo_rx == '0) & wr_en_fifo_rx;
-    assign full_tx_fifo = free_slots_fifo_tx == '0;
 
-    rx_fifo #(.DEPTH(DEPTH_FIFO), .DATA_WIDTH(DATA_WIDTH_FIFO)) u_tx_fifo (
-        .wr_clk_i(clk_system),
-        .rd_clk_i(clk_tx),
-        .rst_n(rst_n), // TODO ver a questão de cdc
-
-        .wr_data_i(SpW_Packet_TX),
-        .wr_en_i(SpW_Packet_TX_en),
-
-        .rd_en_i(rd_en_fifo_tx_temp),
-        .rd_data_o(rd_data_fifo_tx_temp),
-        .empty_o(empty_tx_fifo_temp),
-        .free_space_o(free_slots_fifo_tx)
+    async_fifo #(.DSIZE(DATA_WIDTH_FIFO), .ASIZE($clog2(DEPTH_FIFO))) u_tx_fifo(  
+        .wfull(full_tx_fifo),
+        .wdata(SpW_Packet_TX),
+        .winc(SpW_Packet_TX_en), 
+        .wclk(clk_system),
+        .wrst_n(rst_n),
+        
+        .rempty(empty_tx_fifo_temp),
+        .rdata(rd_data_fifo_tx_temp),
+        .rinc(rd_en_fifo_tx_temp),
+        .rclk(clk_tx),
+        .rrst_n(rst_n)  // TODO ver a questão de cdc
     );
 
     // Módulo para lisar com os erros, colocando EEP no final e esvaziando até o EOP
     // TODO verificar se isso pode dar conflito se o EOP estiver muito longo
+    logic rx_Error, parity_err, escape_err;
+    logic disconnect, start_link;
 
     error_cleanup_fsm u_error_cleanup_fsm (
         .clk_system (clk_system),
@@ -105,7 +106,6 @@ module codec #(
         .empty_tx_fifo (empty_tx_fifo)
     );
 
-    logic run_state;
     logic got_data, got_fct, got_eop, got_eep, got_null, got_timecode;
 
     logic [7:0] payload;
@@ -119,7 +119,7 @@ module codec #(
         .clk(clk_system),
         .rst_n(rst_n & rst_n_rx & rst_n_tx), // TODO falta arrumar aqui para ele funcionar com o rst da máquina de estado quadno rst o tx eo rx
         .run_state(run_state),
-        .en_out_fifo_tx(!empty_tx_fifo_temp & rd_data_fifo_tx),
+        .en_out_fifo_tx(!empty_tx_fifo_temp & rd_en_fifo_tx),
         .got_FCT_rx(got_fct),
         .sending_allowed(sending_allowed),
         .en_in_fifo_rx(wr_en_fifo_rx),
@@ -128,13 +128,11 @@ module codec #(
     );
 
     logic got_bit;
-    logic rx_Error, parity_err, escape_err;
     assign rx_Error = escape_err | parity_err;
 
     logic en_rx; // TODO analisar depois se os módulos possuem um sinal para ativar
     logic en_tx; // TODO analisar depois se os módulos possuem um sinal para ativar
     logic send_null;
-    logic disconnect, start_link;
     assign start_link = 1; // TODO verificar o que seria essa start_link, mas creio
                            // que seja um sinal externo para controle de quandoa ativar o rx
 
@@ -205,7 +203,7 @@ module codec #(
     assign rst_n_rx_final = rst_n & rst_n_rx;
 
     always_ff @(posedge clk_ref_tx or negedge rst_n_rx_final) begin
-        if (!rst_n)
+        if (!rst_n_rx_final)
             wrst_n_sync_ff <= 2'b00;
         else
             wrst_n_sync_ff <= {wrst_n_sync_ff[0], 1'b1};
@@ -213,7 +211,7 @@ module codec #(
 
     assign wrst_n_sync = wrst_n_sync_ff[1];
 
-    fifo1 #(.DSIZE(DSIZE), .ASIZE(ASIZE)) u_fifo_sync_rx(  
+    async_fifo #(.DSIZE(DSIZE), .ASIZE(ASIZE)) u_fifo_sync_rx(  
         .wfull(), // TODO colocar isso no teste, se der alto sinalizar erro
         .rempty(rd_empty_fifo_sync),
         .wdata(wr_data_fifo_sync),
@@ -288,6 +286,7 @@ module codec #(
     end
 
     logic bit_tick; //TODO falta conectar
+    assign bit_tick = 1'b1;
 
     tx u_tx(
         .clk_tx(clk_tx),
@@ -299,7 +298,7 @@ module codec #(
         .rd_data_fifo(rd_data_fifo_tx), 
         .empty_fifo(empty_tx_fifo),
         .run_state(run_state),
-        .bit_tick_i(1), // TODO perguntar o que seria isso
+        .bit_tick_i(bit_tick),
         .send_fct_i(send_fct),
         .send_null_i(send_null),
         .send_timecode_i(Time_Code_TX_valid),

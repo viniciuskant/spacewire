@@ -41,7 +41,6 @@ module tx_char (
 
     logic bit_valid_n, bit_n;
 
-    logic idle_settled, idle_settled_n;
 
     assign busy_o = (state != ST_IDLE);
     //logica combinacional:
@@ -57,45 +56,41 @@ module tx_char (
         xor_acc_n       = xor_acc;
         bit_valid_n     = 1'b0;
         bit_n           = 1'b0;
-        idle_settled_n  = (state == ST_IDLE);
         
         unique case (state)
 
             ST_IDLE: begin
-
-                if (idle_settled) begin
-                    // Arbitragem de prioridade fixa (Guia, p.56)
-                    if (send_timecode_i) begin
-                        cur_flag_n      = 1'b1; // ESC e caractere de controle
-                        payload_sh_n    = PAYLOAD_ESC; // MSB primeiro no bit0
-                        bit_cnt_n       = 4'd2;
-                        tc_latch_n      = timecode_i;
-                        part2_pending_n = PART2_TC_DATA;
-                        state_n         = ST_PARITY;
-                    end
-                    else if (send_fct_i) begin
-                        cur_flag_n      = 1'b1;
-                        payload_sh_n    = PAYLOAD_FCT;
-                        bit_cnt_n       = 4'd2;
-                        part2_pending_n = PART2_NONE;
-                        state_n         = ST_PARITY;
-                    end
-                    else if (send_data_i) begin
-                        cur_flag_n      = data_i[8]; // dado
-                        payload_sh_n    = data_i[7:0]; // LSB primeiro (Guia, p.53)
-                        bit_cnt_n       = (data_i[8] == 1)? 4'd2 : 4'd8;
-                        part2_pending_n = PART2_NONE;
-                        state_n         = ST_PARITY;
-                    end
-                    else if (send_null_i) begin
-                        cur_flag_n      = 1'b1;                 // ESC (1a metade do Null)
-                        payload_sh_n    = PAYLOAD_ESC;
-                        bit_cnt_n       = 4'd2;
-                        part2_pending_n = PART2_NULL_FCT;
-                        state_n         = ST_PARITY;
-                    end
-                    // senao: permanece ocioso, nao transmite nada
+                // Arbitragem de prioridade fixa (Guia, p.56)
+                if (send_timecode_i) begin
+                    cur_flag_n      = 1'b1; // ESC e caractere de controle
+                    payload_sh_n    = PAYLOAD_ESC; // MSB primeiro no bit0
+                    bit_cnt_n       = 4'd2;
+                    tc_latch_n      = timecode_i;
+                    part2_pending_n = PART2_TC_DATA;
+                    state_n         = ST_PARITY;
                 end
+                else if (send_fct_i) begin
+                    cur_flag_n      = 1'b1;
+                    payload_sh_n    = PAYLOAD_FCT;
+                    bit_cnt_n       = 4'd2;
+                    part2_pending_n = PART2_NONE;
+                    state_n         = ST_PARITY;
+                end
+                else if (send_data_i) begin
+                    cur_flag_n      = data_i[8]; // dado
+                    payload_sh_n    = data_i[7:0]; // LSB primeiro (Guia, p.53)
+                    bit_cnt_n       = (data_i[8] == 1)? 4'd2 : 4'd8;
+                    part2_pending_n = PART2_NONE;
+                    state_n         = ST_PARITY;
+                end
+                else if (send_null_i) begin
+                    cur_flag_n      = 1'b1;                 // ESC (1a metade do Null)
+                    payload_sh_n    = PAYLOAD_ESC;
+                    bit_cnt_n       = 4'd2;
+                    part2_pending_n = PART2_NULL_FCT;
+                    state_n         = ST_PARITY;
+                end
+                // senao: permanece ocioso, nao transmite nada
             end
 
             // -------------------------------------------------------------
@@ -172,7 +167,6 @@ module tx_char (
             xor_acc       <= 1'b0;
             bit_valid_o   <= 1'b0;
             bit_o         <= 1'b0;
-            idle_settled  <= 1'b0;
         end else begin
             state         <= state_n;
             part2_pending <= part2_pending_n;
@@ -184,7 +178,6 @@ module tx_char (
             xor_acc       <= xor_acc_n;
             bit_valid_o   <= bit_valid_n;
             bit_o         <= bit_n;
-            idle_settled  <= idle_settled_n;
         end
     end
 

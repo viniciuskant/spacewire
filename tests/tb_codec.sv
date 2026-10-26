@@ -254,9 +254,22 @@ module tb_codec #(
         send_A_to_B_and_check(data_test);
 
 
+        repeat (10) @(posedge clk_system); // TODO para teste, ver como isso tem que ficar depois
+        
         // load Tx data to send and  wait for valid data to appear on SpW Rx output
+        enable_disconnect_A_to_B = 1;
+        enable_parity_err_A_to_B = 0;
+        $display("Wait disconnect A to B",);
+        wait_disconnect_A_to_B();
+
         enable_disconnect_A_to_B = 0;
         enable_parity_err_A_to_B = 1;
+        $display("\n\nWaiting for SpW Uplink to Connect");
+        wait(dut_codec_A.run_state && dut_codec_B.run_state);
+        $display("SpW Uplink Connected !\n");
+        
+
+        // load Tx data to send and  wait for valid data to appear on SpW Rx output
         data_test = 9'b0_0100_1111;
         $display("SpW Data Loaded (A -> B) : %x\n", data_test);
         send_packet_A(data_test); // TODO não tem o check pq vai ser enviado errado
@@ -266,22 +279,6 @@ module tb_codec #(
         send_packet_A(data_test);
         wait_parity_err_B();
 
-        repeat (10) @(posedge clk_system); // TODO para teste, ver como isso tem que ficar depois
-        enable_disconnect_A_to_B = 0;
-        enable_parity_err_A_to_B = 0;
-
-        $display("\n\nWaiting for SpW Uplink to Connect");
-
-        wait(dut_codec_A.run_state && dut_codec_B.run_state);
-        $display("SpW Uplink Connected !\n");
-        
-        // load Tx data to send and  wait for valid data to appear on SpW Rx output
-        enable_disconnect_A_to_B = 1;
-        enable_parity_err_A_to_B = 0;
-        data_test = 9'b0_0101_1110;
-        $display("Wait disconnect A to B",);
-        send_packet_A(data_test);
-        wait_disconnect_A_to_B();
 
         $display(">>>>>>>>>>>> TEST OK");
         $finish;
