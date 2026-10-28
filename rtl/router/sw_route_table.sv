@@ -1,23 +1,3 @@
-// =============================================================================
-// sw_route_table — Tabela de rotas da matriz do roteador SpaceWire
-// (Guia de desenvolvimento da Matriz, "Bloco 2 — Tabela de rotas")
-//
-// Para cada ENDEREÇO LÓGICO (32 a 254) guarda:
-//   - port_mem  : qual porta de saída usar (PW bits)
-//   - valid_mem : se a rota existe (1) ou não (0)
-//
-// Endereços de CAMINHO (1 a N) NÃO passam por aqui: o próprio número já é a
-// porta de saída. Por isso qualquer endereço fora de 32..254 dá hit = 0.
-//
-// Escrita (programação): uma por ciclo, síncrona ao clk.
-// Consulta: combinacional, UMA POR PORTA DE ENTRADA, todas no mesmo ciclo,
-//           porque várias entradas podem estar lendo cabeçalho ao mesmo tempo.
-//
-// Convenção de vetores "por porta": usamos vetores PACKED 2D indexados pelo
-// número da porta, [N_PORTS:1][largura-1:0] (ex.: lookup_addr_i[2] é o
-// endereço da entrada 2). O Icarus 12 aceita isso nas portas, então não foi
-// preciso achatar. Essa mesma convenção será usada nos próximos módulos.
-// =============================================================================
 module sw_route_table #(
     parameter int N_PORTS = 4                    // portas físicas(2--31)
 )(
