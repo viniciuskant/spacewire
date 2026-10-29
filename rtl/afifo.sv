@@ -52,7 +52,6 @@ always @(posedge i_wclk or negedge i_wrst_n) begin
         wbin <= 0;
         wgray <= 0;
     end else begin
-        // 2-FF synchronizer
         wbin <= wbinnext;
         wgray <= wgraynext;
     end

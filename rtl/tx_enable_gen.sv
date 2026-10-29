@@ -11,25 +11,24 @@
 module tx_enable_gen (
     input logic clk,
     input logic rst_n,
-    input logic [7:0] clk_div,
-    output logic en_out
+    // "Enable TX" signal from the FSM
+    input logic tx_enable,
+    input logic [6:0] clk_div,
+    // if low, the `clk_div` gets overwritten with the 10MHz rate
+    input logic use_run_rate,
+    // generated `enable`
+    output logic bit_en
 );
-logic [7:0] counter;
-logic en;
-assign en_out = en;
-always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        counter <= 8'b0;
-        en <= 0;
-    end else begin
-        if (counter == clk_div) begin
-            en <= 1;
-            counter <= 8'b0;
-        end else begin
-            en <= 0;
-            counter <= counter + 1;
-        end
-    end
+// 200MHz / (19 + 1) = 10MHz
+localparam [6:0] START_DIV = 19;
+logic [6:0] counter;
+wire [6:0] div = use_run_rate ? clk_div : START_DIV;
 
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) counter <= START_DIV;
+    else if (!tx_enable) counter <= START_DIV;
+    else if (counter == 0) counter <= div;
+    else counter <= counter - 1;
 end
+assign bit_en = tx_enable && (counter == 0);
 endmodule
