@@ -43,7 +43,7 @@ module tx(
     wire host_valid = !i_fifo_empty;
 
     wire tc_accept, tc_valid;
-    wire [8:0] timecode;
+    wire [7:0] timecode;
     tx_timecode_slot slot0 (
     .i_sys_clk(i_sys_clk),
     .i_sys_rstn(i_sys_rstn),
@@ -75,16 +75,16 @@ module tx(
 
 
     wire sys_wr_ready, sys_wr_valid;
-    wire [2:0] payload_type_sys;
-    wire [7:0] payload_sys;
+    wire [2:0] sys_payload_type;
+    wire [7:0] sys_payload;
     tx_selector sel0 (
         .i_link_connecting(i_link_connecting),
         .i_link_run(i_link_run),
         .i_fct_due(i_fct_due),
         .i_tc_valid(tc_valid),
         .i_tc_data(timecode),
-        .i_nchar_valid(host_valid),
-        .i_nchar_data(i_fifo_rdata),
+        .i_nchar_valid(sel_nchar_valid),
+        .i_nchar_data(sel_nchar_data),
         .i_has_credit(i_has_credit),
         .i_wr_ready(sys_wr_ready),
         .o_wr_valid(sys_wr_valid),
@@ -92,8 +92,9 @@ module tx(
         .o_wr_payload(sys_payload),
         .o_fct_accept(o_fct_accept),
         .o_tc_accept(tc_accept),
-        .o_nchar_accept(o_nchar_accept)
+        .o_nchar_accept(sel_nchar_accept)
     );
+    assign o_nchar_accept = sel_nchar_accept;
 
 
     // ----------- SYS -> TX clock boundary -----------------
@@ -103,7 +104,7 @@ module tx(
     cdc_sys_tx cdc0 (
     .i_sys_clk(i_sys_clk),
     .i_sys_rstn(i_sys_rstn), // from reset_sync, system domain
-    .i_sys_wr_valid(wr_valid), // assert to write FIFO
+    .i_sys_wr_valid(sys_wr_valid), // assert to write FIFO
     .i_sys_payload_type(sys_payload_type),
     .i_sys_payload(sys_payload),
     .i_sys_tx_enable(i_tx_enable),
@@ -138,8 +139,8 @@ module tx(
         .rst_n(i_tx_rstn),
         .bit_en(bit_en),
         .tx_enable(tx_enable_tx),
-        .payload_type(tx_ser_payload),
-        .payload(tx_ser_payload_type),
+        .payload_type(tx_ser_payload_type),
+        .payload(tx_ser_payload),
         .valid(tx_ser_valid),
         .pop(tx_ser_pop),
         .data_out(tx_ser_data_out),

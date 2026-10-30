@@ -42,7 +42,7 @@ always_comb begin
     if (grant_tc) begin
         o_wr_payload_type = TYP_TC;
         o_wr_payload = i_tc_data;
-    end else if (grant_tc) begin
+    end else if (grant_fct) begin
         o_wr_payload_type = TYP_FCT;
     end else if (grant_nchar) begin
         if (!i_nchar_data[8]) begin // it's a data NCHAR

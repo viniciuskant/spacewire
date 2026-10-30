@@ -12,7 +12,7 @@ module fifo #(parameter ASIZE = 2, DSIZE = 16) (
 
 localparam int FIFO_SIZE = 1 << ASIZE;
 
-reg [DSIZE-1:0] mem [0:FIFO_SIZE];
+reg [DSIZE-1:0] mem [0:FIFO_SIZE-1];
 reg [ASIZE:0]       wptr, rptr;        // One extra bit to count laps
 
 wire empty = (wptr == rptr);

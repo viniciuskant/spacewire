@@ -63,9 +63,5 @@ module sync_gray_ctr #(parameter WIDTH=2)
     end
     assign o_rgray = gray_ff2;
 
-    `ifdef FORMAL
-    a
-
-    `endif
 
 endmodule

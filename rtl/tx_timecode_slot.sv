@@ -1,3 +1,4 @@
+// this module holds a timecode for the TX selector
 module tx_timecode_slot (
     input i_sys_clk,
     input i_sys_rstn,

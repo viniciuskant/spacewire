@@ -89,6 +89,7 @@ module tx_serializer (
         // if the FIFO is empty (!valid),
         // send a NULL to keep the link alive
         shift_size = 8;
+        shift_value = 0;
         // first shift the ESC
         shift_value[0:3] = {prev_xor, 1'b1, CODE_ESC};
         // the FCT parity bit is 0 and the control flag is 1
