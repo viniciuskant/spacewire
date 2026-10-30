@@ -1,13 +1,10 @@
-rtl/afifo.sv
-rtl/fifos/fifomem.sv
-rtl/fifos/sync_w2r.sv
-rtl/fifos/sync_r2w.sv
-rtl/fifos/async_fifo.sv
-rtl/fifos/sync_fifo.sv
-rtl/fifos/wptr_full.sv
-rtl/fifos/rptr_empty.sv
-
++incdir+rtl/include
 rtl/cdc_sync.sv
+rtl/afifo.sv
+rtl/fifo.sv
+rtl/credit.sv
+
+rtl/cdc_sys_tx.sv
 
 rtl/spw_char_decode.sv
 
@@ -19,6 +16,9 @@ rtl/rx_signal.sv
 rtl/rx_char.sv
 rtl/rx.sv
 
+rtl/tx_timecode_slot.sv
+rtl/tx_spill.sv
+rtl/tx_selector.sv
 rtl/tx_serializer.sv
 rtl/tx_ds_encoder.sv
 rtl/tx_enable_gen.sv

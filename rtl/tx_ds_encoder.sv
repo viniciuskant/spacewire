@@ -2,33 +2,38 @@
 // `bit_valid_i` is asserted to write `bit_i`.
 module tx_ds_encoder (
     // TX high-speed clock
-    input  logic clk,
-    input  logic rst_n,
+    input  logic i_tx_clk,
+    input  logic i_tx_rstn,
+    input logic i_tx_enable,
 
     // connected to the enable generator
-    input logic bit_en,
+    input logic i_bit_en,
 
-    input  logic bit_i,   
+    input logic i_data,   
+    input logic i_valid,
 
-    output logic D_out,
-    output logic S_out
+    output o_D,
+    output o_S
 );
 
     logic D_reg;
     logic S_reg;
 
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+    always_ff @(posedge i_tx_clk or negedge i_tx_rstn) begin
+        if (!i_tx_rstn) begin
             D_reg <= 1'b0;
             S_reg <= 1'b0;
-        end else if (bit_en) begin
-            if (bit_i == D_reg)
+        end else if (!i_tx_enable) begin
+            D_reg <= 1'b0;
+            S_reg <= 1'b0;
+        end else if (i_bit_en && i_valid) begin
+            D_reg <= i_data;
+            if (i_data == D_reg)
                 S_reg <= ~S_reg; 
-            D_reg <= bit_i;
         end
     end
 
-    assign D_out = D_reg;
-    assign S_out = S_reg;
+    assign o_D = D_reg;
+    assign o_S = S_reg;
 
 endmodule

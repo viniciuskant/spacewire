@@ -1,3 +1,4 @@
+`include "tx_serializer_typ.svh"
 
 // Serializes NULLs/FCTs/NCHARs/TIMECODEs into
 // the spacewire protocol. The output is not yet
@@ -30,14 +31,12 @@ module tx_serializer (
     // asserted when `data_out` is valid
     output valid_out
 );
-    localparam [2:0] TYP_DATA = 0;
-    localparam [2:0] TYP_EOP  = 1;
-    localparam [2:0] TYP_EEP  = 2;
-    localparam [2:0] TYP_FCT  = 3;
-    localparam [2:0] TYP_NULL = 4;
-    localparam [2:0] TYP_TC   = 5;
-    localparam [2:0] TYP_INVALID1   = 6;
-    localparam [2:0] TYP_INVALID2   = 7;
+    // localparam [2:0] TYP_DATA = 0;
+    // localparam [2:0] TYP_EOP  = 1;
+    // localparam [2:0] TYP_EEP  = 2;
+    // localparam [2:0] TYP_FCT  = 3;
+    // localparam [2:0] TYP_NULL = 4;
+    // localparam [2:0] TYP_TC   = 5;
 
     // character codes as defined per the spec
     localparam [0:1] CODE_FCT  = 2'b00;
@@ -157,7 +156,6 @@ module tx_serializer (
 
     `ifndef SYNTHESIS
     assert property (@(posedge clk) disable iff (!rst_n)
-        (boundary && valid) |-> payload_type inside {TYP_DATA, TYP_EOP, TYP_EEP, TYP_FCT, TYP_TC})
-        else $error("tx_serializer: invalid payload_type %0d", payload_type);
+        (boundary && valid) |-> payload_type inside {TYP_DATA, TYP_EOP, TYP_EEP, TYP_FCT, TYP_TC});
     `endif
 endmodule

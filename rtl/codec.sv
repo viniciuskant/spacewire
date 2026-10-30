@@ -28,10 +28,10 @@ module codec #(
     output empty_rx_fifo,
 
     // timecode
-    input [7:0] Time_Code_TX,
-    input Time_Code_TX_valid,
-    output [7:0] Time_Code_RX,
-    output Time_Code_RX_valid
+    input [7:0] time_in,
+    input tick_in,
+    output [7:0] time_out,
+    output tick_out,
 );
 
     localparam int DIV_10MHz = (REF_TX_FREQ_HZ / (2*CLK_FREQ));

@@ -1,84 +1,160 @@
+// TX subsystem
 module tx(
-    input logic clk_tx,
-    input logic clk_system,
-    input logic rst_n,
+    // 200MHz clock
+    input i_tx_clk,
+    input i_tx_rstn,
+    // 50MHz system clock, with same phase as 200MHz clock
+    input i_sys_clk,
+    input i_sys_rstn,
 
-    output logic D_out,
-    output logic S_out,
+    // run rate
+    input [6:0] i_clk_div,
 
-    output logic rd_en_fifo,
-    input logic [8:0] rd_data_fifo,
-    input logic empty_fifo,
+    // From the FSM
+    // This is the "enable TX" signal from the FSM. It remains
+    // high in all FSM states except "ErrorReset" and "ErrorWait"
+    input i_tx_enable,
+    input i_link_error,
+    input i_link_connecting,
+    input i_link_run,
+    input i_use_run_rate,
 
-    input logic run_state,
-    input logic bit_tick_i,
-    input logic send_fct_i,
-    input logic send_null_i,
-    output logic char_ack_o,
+    // FIFO interface
+    input i_fifo_empty,
+    input [8:0] i_fifo_rdata,
+    output o_fifo_pop,
 
-    input logic send_timecode_i,
-    input logic [7:0] timecode_i
+    // Timecode interface
+    input i_tick_in,
+    input [7:0] i_timecode,
+
+    // Credit interface
+    input i_has_credit,
+    input i_fct_due,
+    output o_nchar_accept,
+    output o_fct_accept,
+
+    // Serial interface
+    output o_D,
+    output o_S
+
 );
-    logic busy_char;
-    logic busy;
 
-    logic [7:0] tc_fifo_rdata;
-    logic tc_fifo_rempty;
-    logic tc_fifo_wfull;
-    logic tc_fifo_rinc;
+    wire host_valid = !i_fifo_empty;
 
-    async_fifo #(.DSIZE(8), .ASIZE(4)) u_tc_fifo ( // TODO não sei se seria extremamente necessário, mas acho válido para não perder time code
-        .wfull (tc_fifo_wfull),
-        .rempty (tc_fifo_rempty),
-        .wdata (timecode_i),
-        .winc (send_timecode_i),
-        .wclk (clk_system),
-        .wrst_n (rst_n),
-        .rdata (tc_fifo_rdata),
-        .rinc (tc_fifo_rinc),
-        .rclk (clk_tx),
-        .rrst_n (rst_n)
+    wire tc_accept, tc_valid;
+    wire [8:0] timecode;
+    tx_timecode_slot slot0 (
+    .i_sys_clk(i_sys_clk),
+    .i_sys_rstn(i_sys_rstn),
+    .i_link_run(i_link_run),
+    .i_tc_accept(tc_accept), // from the selector
+    .i_tick_in(i_tick_in),
+    .i_timecode(i_timecode),
+    .o_tc_valid(tc_valid),
+    .o_timecode(timecode)
     );
 
-    assign busy = busy_char | ~tc_fifo_rempty;
+    wire spilling;
 
-    logic rd_en_cond, rd_en_cond_d;
-    assign rd_en_cond = ~busy & ~empty_fifo;
+    wire sel_nchar_accept, sel_nchar_valid;
+    wire [8:0] sel_nchar_data;
 
-    always_ff @(posedge clk_tx or negedge rst_n) begin
-        if (!rst_n) rd_en_cond_d <= 1'b0;
-        else rd_en_cond_d <= rd_en_cond;
-    end
-
-    assign rd_en_fifo = rd_en_cond & ~rd_en_cond_d;
-
-    assign tc_fifo_rinc = !busy_char & ~tc_fifo_rempty;
-
-    logic bit_valid;
-    logic bit_signal;
-
-    tx_signal u_tx_signal (
-        .clk(clk_tx),
-        .rst_n(rst_n),
-        .bit_valid_i(bit_valid),
-        .bit_i(bit_signal),
-        .D_out(D_out),
-        .S_out(S_out)
+    tx_spill spill0 (
+        .i_sys_clk(i_sys_clk),
+        .i_sys_rstn(i_sys_rstn),
+        .i_link_error(i_link_error),
+        .i_host_valid(host_valid),
+        .i_host_data(i_fifo_rdata),
+        .o_host_pop(o_fifo_pop),
+        .i_sel_nchar_accept(sel_nchar_accept),
+        .o_sel_nchar_valid(sel_nchar_valid),
+        .o_sel_nchar_data(sel_nchar_data),
+        .o_spilling(spilling)
     );
 
-    tx_char u_tx_char (
-        .clk(clk_tx),
-        .rst_n(rst_n),
-        .bit_tick_i(bit_tick_i),
-        .send_data_i(rd_en_cond),
-        .data_i(rd_data_fifo),
-        .busy_o(busy_char),
-        .send_fct_i(send_fct_i),
-        .send_null_i(send_null_i),
-        .send_timecode_i(~tc_fifo_rempty),
-        .timecode_i(tc_fifo_rdata),
-        .bit_valid_o(bit_valid),
-        .bit_o(bit_signal)
+
+    wire sys_wr_ready, sys_wr_valid;
+    wire [2:0] payload_type_sys;
+    wire [7:0] payload_sys;
+    tx_selector sel0 (
+        .i_link_connecting(i_link_connecting),
+        .i_link_run(i_link_run),
+        .i_fct_due(i_fct_due),
+        .i_tc_valid(tc_valid),
+        .i_tc_data(timecode),
+        .i_nchar_valid(host_valid),
+        .i_nchar_data(i_fifo_rdata),
+        .i_has_credit(i_has_credit),
+        .i_wr_ready(sys_wr_ready),
+        .o_wr_valid(sys_wr_valid),
+        .o_wr_payload_type(sys_payload_type),
+        .o_wr_payload(sys_payload),
+        .o_fct_accept(o_fct_accept),
+        .o_tc_accept(tc_accept),
+        .o_nchar_accept(o_nchar_accept)
     );
+
+
+    // ----------- SYS -> TX clock boundary -----------------
+    wire tx_ser_pop, tx_ser_valid, tx_enable_tx, tx_use_run_rate;
+    wire [2:0] tx_ser_payload_type;
+    wire [7:0] tx_ser_payload;
+    cdc_sys_tx cdc0 (
+    .i_sys_clk(i_sys_clk),
+    .i_sys_rstn(i_sys_rstn), // from reset_sync, system domain
+    .i_sys_wr_valid(wr_valid), // assert to write FIFO
+    .i_sys_payload_type(sys_payload_type),
+    .i_sys_payload(sys_payload),
+    .i_sys_tx_enable(i_tx_enable),
+    .i_sys_use_run_rate(i_use_run_rate),
+    .o_sys_wr_ready(sys_wr_ready), // FIFO not full
+
+    // TX clock domain
+    .i_tx_clk(i_tx_clk),
+    .i_tx_rstn(i_tx_rstn), // from reset_sync, TX domain
+    .i_tx_pop(tx_ser_pop),
+    .o_tx_rd_valid(tx_ser_valid),
+    .o_tx_payload_type(tx_ser_payload_type),
+    .o_tx_payload(tx_ser_payload),
+    .o_tx_enable_tx(tx_enable_tx),
+    .o_tx_use_run_rate(tx_use_run_rate)
+    );
+
+    // enable generator
+    wire bit_en;
+    tx_enable_gen gen0 (
+        .clk(i_tx_clk),
+        .rst_n(i_tx_rstn),
+        .tx_enable(tx_enable_tx),
+        .clk_div(i_clk_div),
+        .use_run_rate(tx_use_run_rate),
+        .bit_en(bit_en)
+    );
+
+    wire tx_ser_data_out, tx_ser_valid_out;
+    tx_serializer ser0 (
+        .clk(i_tx_clk),
+        .rst_n(i_tx_rstn),
+        .bit_en(bit_en),
+        .tx_enable(tx_enable_tx),
+        .payload_type(tx_ser_payload),
+        .payload(tx_ser_payload_type),
+        .valid(tx_ser_valid),
+        .pop(tx_ser_pop),
+        .data_out(tx_ser_data_out),
+        .valid_out(tx_ser_valid_out)
+    );
+    tx_ds_encoder enc0 (
+        .i_tx_clk(i_tx_clk),
+        .i_tx_rstn(i_tx_rstn),
+        .i_tx_enable(tx_enable_tx),
+        .i_bit_en(bit_en),
+        .i_data(tx_ser_data_out),
+        .i_valid(tx_ser_valid_out),
+        .o_D(o_D),
+        .o_S(o_S)
+    );
+
 
 endmodule

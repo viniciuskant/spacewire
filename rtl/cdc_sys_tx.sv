@@ -13,8 +13,6 @@ module cdc_sys_tx
     input [7:0] i_sys_payload,
     input i_sys_tx_enable,
     input i_sys_use_run_rate,
-    // TODO: verify that this signal is quasi-static
-    input [7:0] i_sys_run_div,
     output o_sys_wr_ready, // FIFO not full
 
     // TX clock domain
@@ -24,7 +22,6 @@ module cdc_sys_tx
     output o_tx_rd_valid,
     output [2:0] o_tx_payload_type,
     output [7:0] o_tx_payload,
-    output [7:0] o_tx_run_div,
     output o_tx_enable_tx,
     output o_tx_use_run_rate
 );
@@ -59,5 +56,4 @@ module cdc_sys_tx
         .sync_data(o_tx_use_run_rate)
     );
 
-    assign o_tx_run_div = i_sys_run_div;
 endmodule

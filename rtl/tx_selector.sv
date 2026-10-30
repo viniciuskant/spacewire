@@ -9,51 +9,51 @@
 // the asynchronous FIFO, so this module stays in the
 // system domain.
 module tx_selector (
-    input link_connecting,
-    input link_run,
-    input fct_due,
-    input tc_valid,
-    input [7:0] tc_data,
-    input nchar_valid,
-    input [8:0] nchar_data,
-    input has_credit,
-    input wr_ready,
-    output wr_valid,
-    output [2:0] wr_payload_type,
-    output [7:0] wr_payload,
-    output fct_accept,
-    output tc_accept,
-    output nchar_accept
+    input i_link_connecting,
+    input i_link_run,
+    input i_fct_due,
+    input i_tc_valid,
+    input [7:0] i_tc_data,
+    input i_nchar_valid,
+    input [8:0] i_nchar_data,
+    input i_has_credit,
+    input i_wr_ready,
+    output o_wr_valid,
+    output logic [2:0] o_wr_payload_type,
+    output logic [7:0] o_wr_payload,
+    output o_fct_accept,
+    output o_tc_accept,
+    output o_nchar_accept
 );
-wire fct_ok = fct_due && (link_connecting || link_run);
-wire tc_ok = tc_valid && link_run;
-wire nchar_ok = nchar_valid && has_credit && link_run;
+wire fct_ok = i_fct_due && (i_link_connecting || i_link_run);
+wire tc_ok = i_tc_valid && i_link_run;
+wire nchar_ok = i_nchar_valid && i_has_credit && i_link_run;
 
 // one-hot grant
 wire grant_tc = tc_ok;
 wire grant_fct = !tc_ok && fct_ok;
 wire grant_nchar = !tc_ok && !fct_ok && nchar_ok;
 
-assign wr_valid = grant_tc || grant_fct || grant_nchar;
+assign o_wr_valid = grant_tc || grant_fct || grant_nchar;
 
 always_comb begin
-    wr_payload = 0;
-    wr_payload_type = 0;
+    o_wr_payload = 0;
+    o_wr_payload_type = 0;
     if (grant_tc) begin
-        wr_payload_type = TYP_TC;
-        wr_payload = tc_data;
+        o_wr_payload_type = TYP_TC;
+        o_wr_payload = i_tc_data;
     end else if (grant_tc) begin
-        wr_payload_type = TYP_FCT;
+        o_wr_payload_type = TYP_FCT;
     end else if (grant_nchar) begin
-        if (!nchar_data[8]) begin // it's a data NCHAR
-            wr_payload_type = TYP_DATA;
-            wr_payload = nchar_data[7:0];
-        end else if (!nchar_data[0]) wr_payload_type = TYP_EOP;
-        else wr_payload_type = TYP_EEP;
+        if (!i_nchar_data[8]) begin // it's a data NCHAR
+            o_wr_payload_type = TYP_DATA;
+            o_wr_payload = i_nchar_data[7:0];
+        end else if (!i_nchar_data[0]) o_wr_payload_type = TYP_EOP;
+        else o_wr_payload_type = TYP_EEP;
     end
 end
 
-assign fct_accept = wr_ready && grant_fct;
-assign nchar_accept = wr_ready && grant_nchar;
-assign tc_accept = wr_ready && grant_tc;
+assign o_fct_accept = i_wr_ready && grant_fct;
+assign o_nchar_accept = i_wr_ready && grant_nchar;
+assign o_tc_accept = i_wr_ready && grant_tc;
 endmodule
