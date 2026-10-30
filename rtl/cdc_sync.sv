@@ -1,32 +1,16 @@
-module cdc_sync #(
-    parameter int STAGES = 2
-)(
-    input  logic clk,
-    input  logic d,
-    output logic q
+
+// 2-FF synchronizer
+module sync_2ff (
+    input  clk_dest,      // Destination clock
+    input  rst_n,
+    input  async_data,    // Asynchronous input
+    output sync_data      // Synchronized output
 );
 
-    logic [STAGES-1:0] sync_ff;
+    (* async_reg = "true" *) logic sync_ff1;
+    (* async_reg = "true" *) logic sync_ff2;
 
-    always_ff @(posedge clk) begin
-        sync_ff <= {sync_ff[STAGES-2:0], d};
-    end
-
-    assign q = sync_ff[STAGES-1];
-
-endmodule
-
-module cdc2ff (
-    input  wire clk_dest,      // Destination clock
-    input  wire rst_n,
-    input  wire async_data,    // Asynchronous input
-    output wire sync_data      // Synchronized output
-);
-
-    (* async_reg = "true" *) reg sync_ff1;
-    (* async_reg = "true" *) reg sync_ff2;
-
-    always @(posedge clk_dest or negedge rst_n) begin
+    always_ff @(posedge clk_dest or negedge rst_n) begin
         if (!rst_n) begin
             sync_ff1 <= 1'b0;
             sync_ff2 <= 1'b0;
@@ -37,5 +21,51 @@ module cdc2ff (
     end
 
     assign sync_data = sync_ff2;
+endmodule
+
+module sync_gray_ctr #(parameter WIDTH=2)
+(
+    // write clock, reset and inputs
+    input i_w_clk,
+    input i_w_rstn,
+    input i_inc,
+    // read clock
+    input i_r_clk,
+    input i_r_rstn,
+    // gray value synchronized to read clock
+    output [WIDTH-1:0] o_rgray
+);
+    logic [WIDTH-1:0] bin;
+    logic [WIDTH-1:0] gray;
+    (* async_reg = "true" *) logic [WIDTH-1:0] gray_ff1;
+    (* async_reg = "true" *) logic [WIDTH-1:0] gray_ff2;
+
+    wire [WIDTH-1:0] nextbin = bin + i_inc;
+    wire [WIDTH-1:0] nextgray = nextbin ^ (nextbin >> 1);
+    always_ff @(posedge i_w_clk or negedge i_w_rstn) begin
+        if (!i_w_rstn) begin 
+            bin <= 0;
+            gray <= 0;
+        end else begin
+            bin <= nextbin;
+            gray <= nextgray;
+        end
+    end
+
+    always_ff @(posedge i_r_clk or negedge i_r_rstn) begin
+        if (!i_r_rstn) begin 
+            gray_ff1 <= 0;
+            gray_ff2 <= 0;
+        end else begin
+            gray_ff1 <= gray;
+            gray_ff2 <= gray_ff1;
+        end
+    end
+    assign o_rgray = gray_ff2;
+
+    `ifdef FORMAL
+    a
+
+    `endif
 
 endmodule
