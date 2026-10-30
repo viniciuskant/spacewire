@@ -37,11 +37,23 @@ function run_rmap_crc8_test {
     ./obj_dir/Vtb_rmap_crc8
 }
 
-
+function run_RMAP_test {
+    echo "Executando teste RMAP"
+    verilator --top-module tb_RMAP \
+        "${TESTS_DIR}/tb_RMAP.sv" \
+        "${RTL_DIR}/RMAP.sv" \
+        "${RTL_DIR}/rmap_crc8.sv" \
+        "${RTL_DIR}/rmap_reg_bank.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_RMAP
+}
 
 case "${nome_do_teste}" in
     rmap_crc8)
         run_rmap_crc8_test
+        ;;
+    RMAP)
+        run_RMAP_test
         ;;
     clean)
         cleanup

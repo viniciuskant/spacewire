@@ -1,15 +1,25 @@
 `timescale 1ns/1ps
 
 module tb_rmap_crc8;
+    logic clk;
+    logic valid;
     logic [7:0] crc_in;
     logic [7:0] data_in;
     logic [7:0] crc_out;
+    
     rmap_crc8 dut (
+        .clk(clk),
         .crc_in(crc_in),
         .data_in(data_in),
-        .crc_out(crc_out)
+        .crc_out(crc_out),
+        .valid(valid)
     );
     
+    initial begin
+        clk = 0;
+        forever #5 clk = ~clk;
+    end
+
     function automatic [7:0] calc_crc8_ref(input [7:0] seed, input [7:0] data);
         logic [7:0] c;
         c = seed ^ data;
@@ -24,13 +34,17 @@ module tb_rmap_crc8;
     endfunction
 
     int errors = 0;
-    int tests  = 0;
+    int tests = 0;
 
     task run_test(input [7:0] seed, input [7:0] data);
         logic [7:0] expected;
  
+        @(negedge clk);
         crc_in = seed;
         data_in = data;
+        valid = 1'b1;
+
+        @(posedge clk);
         #1;
 
         expected = calc_crc8_ref(seed, data);
@@ -40,11 +54,19 @@ module tb_rmap_crc8;
             $error("FALHA! Seed: %02h, Data: %02h | DUT: %02h, Esperado: %02h", seed, data, crc_out, expected);
             errors++;
         end
+        
+        @(negedge clk);
+        valid = 1'b0;
     endtask
 
     logic [7:0] seed;
     logic [7:0] pkt[0:2];
+    
     initial begin
+        valid = 1'b0;
+        crc_in = 8'h00;
+        data_in = 8'h00;
+
         $display("\nTestando sequencia especifica:");
         seed = 8'h00;
         pkt[0] = 8'hFE;
