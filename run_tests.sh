@@ -32,7 +32,7 @@ function run_flow_control_tx_test {
     echo "Executando teste flow_control_tx"
     verilator --top-module tb_flow_control_tx \
         "${TESTS_DIR}/tb_flow_control_tx.sv" \
-        "${RTL_DIR}/flow_control_tx.sv" \
+        "${RTL_DIR}/codec/flow_control_tx.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_flow_control_tx
 }
@@ -41,7 +41,7 @@ function run_flow_control_rx_test {
     echo "Executando teste flow_control_rx"
     verilator --top-module tb_flow_control_rx \
         "${TESTS_DIR}/tb_flow_control_rx.sv" \
-        "${RTL_DIR}/flow_control_rx.sv" \
+        "${RTL_DIR}/codec/flow_control_rx.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_flow_control_rx
 }
@@ -50,7 +50,7 @@ function run_rx_signal_test {
     echo "Executando teste rx_signal"
     verilator --top-module tb_rx_signal \
         "${TESTS_DIR}/tb_rx_signal.sv" \
-        "${RTL_DIR}/rx_signal.sv" \
+        "${RTL_DIR}/codec/rx_signal.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_rx_signal
 }
@@ -59,7 +59,7 @@ function run_rx_char_test {
     echo "Executando teste rx_char"
     verilator --top-module tb_rx_char \
         "${TESTS_DIR}/tb_rx_char.sv" \
-        "${RTL_DIR}/rx_char.sv" \
+        "${RTL_DIR}/codec/rx_char.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_rx_char
 }
@@ -77,7 +77,7 @@ function run_tx_signal_test {
     echo "Executando teste tx_signal"
     verilator --top-module tb_tx_signal \
         "${TESTS_DIR}/tb_tx_signal.sv" \
-        "${RTL_DIR}/tx_signal.sv" \
+        "${RTL_DIR}/codec/tx_signal.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_tx_signal
 }
@@ -86,21 +86,21 @@ function run_codec_test {
     echo "Executando teste codec_"
     verilator --top-module tb_codec \
         "${TESTS_DIR}/tb_codec.sv" \
-        "${RTL_DIR}/codec.sv" \
-        "${RTL_DIR}/var_clk_divider.sv" \
-        "${RTL_DIR}/error_cleanup_fsm.sv" \
-        "${RTL_DIR}/flow_control.sv" \
-        "${RTL_DIR}/flow_control_rx.sv" \
-        "${RTL_DIR}/flow_control_tx.sv" \
-        "${RTL_DIR}/state_machine.sv" \
-        "${RTL_DIR}/rx.sv" \
-        "${RTL_DIR}/rx_char.sv" \
-        "${RTL_DIR}/rx_signal.sv" \
-        "${RTL_DIR}/tx.sv" \
-        "${RTL_DIR}/tx_char.sv" \
-        "${RTL_DIR}/tx_signal.sv" \
-        "${RTL_DIR}/cdc_sync.sv" \
-        "${RTL_DIR}/spw_char_decode.sv" \
+        "${RTL_DIR}/codec/codec.sv" \
+        "${RTL_DIR}/codec/var_clk_divider.sv" \
+        "${RTL_DIR}/codec/error_cleanup_fsm.sv" \
+        "${RTL_DIR}/codec/flow_control.sv" \
+        "${RTL_DIR}/codec/flow_control_rx.sv" \
+        "${RTL_DIR}/codec/flow_control_tx.sv" \
+        "${RTL_DIR}/codec/state_machine.sv" \
+        "${RTL_DIR}/codec/rx.sv" \
+        "${RTL_DIR}/codec/rx_char.sv" \
+        "${RTL_DIR}/codec/rx_signal.sv" \
+        "${RTL_DIR}/codec/tx.sv" \
+        "${RTL_DIR}/codec/tx_char.sv" \
+        "${RTL_DIR}/codec/tx_signal.sv" \
+        "${RTL_DIR}/codec/cdc_sync.sv" \
+        "${RTL_DIR}/codec/spw_char_decode.sv" \
         "${RTL_DIR}/fifos/async_fifo.sv" \
         "${RTL_DIR}/fifos/sync_fifo.sv" \
         "${RTL_DIR}/fifos/fifomem.sv" \
