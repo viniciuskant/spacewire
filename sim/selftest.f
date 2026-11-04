@@ -1,0 +1,14 @@
+link/spw_defines.sv
+link/spw_codec_utils.sv
+link/serial/ds_if.sv
+link/serial/ds_item.sv
+link/serial/ds_partner.sv
+link/serial/ds_driver.sv
+link/serial/ds_monitor.sv
+link/serial/char_decoder.sv
+link/serial/ds_agent.sv
+link/selftest/spw_selftest_checker.sv
+link/selftest/spw_selftest_env.sv
+link/selftest/spw_selftest_seq.sv
+link/selftest/spw_selftest_test.sv
+link/selftest/spw_selftest_top.sv

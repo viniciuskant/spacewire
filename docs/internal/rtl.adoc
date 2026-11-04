@@ -1,0 +1,27 @@
+= SpaceWire Router: RTL Documentation
+
+== SpW Codec
+
+=== Rx
+Modules responsible for the RX subsystem
+
+=== rx_signal.sv
+This module is responsible for recovering the clock
+from D and S.
+
+==== Ports
+- `input rst_n`: asynchronous reset
+- `input D_in`: D input, connected to the IO pad
+- `input S_in`: S input, connected to the IO pad
+- `output [1:0] D_out`: Data output, 2 bits at a time 
+- `output rec_clk`: Recovered clock
+
+==== Observations
+D_in and S_in must be constrained appropriately to minimize skew
+between them.
+
+=== TX
+Modules responsible for the TX subsystem
+
+=== tx_signal.sv
+

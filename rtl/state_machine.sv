@@ -33,22 +33,24 @@ module state_machine #(
     //temporizador
     logic timer_en;
     logic timer_clear;
-    logic [7:0] timer_us_cnt;
+    // 12.8us a 50 MHz são 640 ciclos
+    logic [15:0] timer_us_cnt;
     
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            timer_us_cnt <= 8'd0;
+            timer_us_cnt <= 16'd0;
         end else begin
             if (timer_clear) begin
-                timer_us_cnt <= 8'd0;
+                timer_us_cnt <= 16'd0;
             end else if (timer_en) begin
                 timer_us_cnt <= timer_us_cnt + 1'b1;
             end
         end
     end
 
-    localparam int unsigned T_6_4US_CYCLES  = (CLK_FREQ * 64) / 10_000_000;
-    localparam int unsigned T_12_8US_CYCLES = (CLK_FREQ * 128) / 10_000_000;
+    // CLK_FREQ é a frequência de clk; longint porque CLK_FREQ * 128 não cabe em int
+    localparam int unsigned T_6_4US_CYCLES  = int'((longint'(CLK_FREQ) * 64) / 10_000_000);
+    localparam int unsigned T_12_8US_CYCLES = int'((longint'(CLK_FREQ) * 128) / 10_000_000);
 
     logic timeout_6_4us;
     logic timeout_12_8us;

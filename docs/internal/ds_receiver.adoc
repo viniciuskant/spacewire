@@ -1,0 +1,157 @@
+= DS Receiver Reference
+
+== Architecture
+
+=== LVDS receivers and matched input paths
+
+The differential inputs become single-ended D and S. The two paths should be matched
+in layout (same cell, same routing, same load), because the D/S skew budget comes
+straight out of the mismatch between them. The receivers should be fail-safe, so
+floating inputs on a disconnected cable don't produce random edges.
+
+=== XOR clock recovery
+
+rx_clk = D xor S. Exactly one of D or S changes per bit, so every bit boundary
+produces one edge on rx_clk, rising or falling. This is a clock at half the bit
+rate that is used on both edges. It is not periodic, since it has the jitter of
+the remote transmitter and it stops when the link stops.
+
+The XOR output should drive nothing but the clock tree, with a scan-mode mux in
+front of it so ATPG can control the clock. Since the XOR is a clock source, its
+output is declared as a generated clock sourced from the D/S pins in your timing constraints.
+
+=== Dual-edge data capture
+
+Capture D on both edges of rx_clk using two flops:
+
+a rising-edge flop captures every other bit (positions 0, 2, 4...),
+a falling-edge flop captures the bits in between.
+
+The two half-rate streams are then interleaved by the shift register, or kept as
+two parallel streams and combined later. A true dual-edge flop is rarely available
+in standard cell libraries, so this two-flop split is the usual implementation.
+Both characters lengths (4 and 10 bits) are even, so once framing is established,
+the assignment of bits to edges stays fixed. One small flop records whether the
+first bit of a character arrived on a rising or a falling edge.
+
+=== Why the data is stable
+
+When D changes, the XOR edge occurs at essentially the same time, so a flop clocked
+by the XOR edge sees new data arriving right at the clock edge. The race is resolved
+by delay: the XOR gate plus the clock tree make the clock arrive later than the data,
+which gives setup margin. The hold side is easy for the same reason. At 5 ns per
+bit there is plenty of margin without a dedicated delay line. When S changes, D
+is stable, so there is nothing to resolve. Because capture is clocked by a signal
+derived from the data itself, no metastability handling is needed in this stage.
+The constraint is the timing relationship, which static timing analysis checks.
+
+=== Skew tolerance
+
+D and S never switch in the same bit period, so the XOR doesn't glitch under ideal
+conditions. A D edge and the next S edge are separated by roughly one bit period,
+minus any skew between the wires and the receiver paths. That separation is your
+tolerance budget. If skew eats so a completed character is processed on the edge of
+the next bit. That is harmless, because NULLs fill every idle gap, so another edge
+always follows. When the link dies, nothing after it matters, because a reset follows.
+
+The decoder's reset must be released synchronously with respect to rx_clk, and since
+rx_clk may not be running, release it with a small reset synchronizer clocked by rx_clk,
+or hold the logic in an asynchronous reset until the first edge.
+
+=== RTL modeling
+
+Keep the XOR as a dedicated cell (hand-instantiated or dont_touch) so synthesis can't
+merge it into other logic.
+
+[source,verilog]
+----
+spw_clkxor u_xor (.a(d_in), .b(s_in), .z(rx_clk));   // wrapper around a library XOR
+
+always @(posedge rx_clk or negedge rx_rst_n)
+  if (!rx_rst_n) d_pos <= 1'b0; else d_pos <= d_in;
+
+always @(negedge rx_clk or negedge rx_rst_n)
+  if (!rx_rst_n) d_neg <= 1'b0; else d_neg <= d_in;
+----
+
+Behavioral XOR plus a posedge flop and a negedge flop is enough for functional simulation,
+lint and synthesis. In zero-delay RTL simulation, the XOR output changes one delta
+after D, so the flops capture the new value, which matches what happens in silicon,
+where the clock path is slower than the data path. The deterministic race is therefore
+harmless in simulation, but your testbench should still drive D and S with realistic
+skew and jitter, because zero skew hides the cases that matter.
+
+=== What goes in SDC
+
+Protecting the front-end netlist:
+[source,tcl]
+----
+# keep the XOR and capture flops exactly as written
+set_dont_touch [get_cells u_rxfe/u_xor]
+set_ungroup [get_cells u_rxfe] false
+set_boundary_optimization [get_cells u_rxfe] false
+----
+
+Clocks and zero-cycle relationship:
+[source,tcl]
+----
+
+# recovered clock defined at the XOR output; edges every bit period
+create_clock -name rx_clk -period 10.0 -waveform {0 5} [get_pins u_xor/Z] ;# 100MHz with 2 bits = 200Mbits/s
+
+model port-to-XOR delay and D arrival relative to the clock edge
+set_clock_latency -source <port_to_xor_delay> [get_clocks rx_clk]
+set_input_delay -clock rx_clk -max <skew_max> [get_ports d_in]
+set_input_delay -clock rx_clk -min <skew_min> [get_ports d_in]
+
+the three domains are mutually asynchronous
+set_clock_groups -asynchronous -group rx_clk -group sys_clk -group tx_clk
+
+the clock is derived from data, so duty cycle matters
+set_min_pulse_width <value> [get_clocks rx_clk]
+----
+
+The unusual part is that D is both a data input and one of the clock sources. How
+you express that (clock defined on the XOR pin with source latency, or clocks defined
+on the D and S ports and propagated through the XOR) depends on your tool and methodology.
+Check with your STA tool that the D-to-flop data path and the D/S-through-XOR clock path
+are both analyzed against each other, because that race is the whole timing story of this block.
+
+=== What needs manual or physical attention
+
+==== Matched D and S paths
+SDC can't make two routes equal. You need symmetric receiver cells, identical routing
+and loading, and a layout check of the post-route skew against the budget from the standard.
+Use shielding or isolation on those nets if your flow allows it.
+
+==== XOR glitch protection
+Static timing doesn't check for runt pulses on a data-derived clock. Use minimum
+pulse width checks, gate-level simulation with SDF back-annotation, and a skew
+sweep in the testbench. Verify that an XOR output pulse is never narrower than
+your flops' minimum clock width.
+
+==== Clock tree synthesis
+The CTS root is the XOR output, so the tree must start there, be balanced across
+the capture flops (both edges used), and keep duty-cycle distortion low. Use inverting
+and non-inverting buffer types in a consistent way, because uneven rise and fall delays
+distort the half-periods you rely on. Make sure CTS treats the XOR as a clock cell and
+doesn't try to balance it against sys_clk or tx_clk.
+
+==== Scan and test
+You need a mux in front of the XOR clock so ATPG can control it, and the dual-edge
+flops need to be handled correctly in scan chains (negedge flops go in their own chain, or with lock-up latches).
+
+==== Tool warnings
+Lint and CDC tools will flag a clock generated from combinational logic. These are
+expected and should be waived with comments, and the XOR should be declared as the
+clock source for the CDC tool so the RX-to-system crossings are analyzed from rx_clk.
+
+==== Reset release
+Reset removal and recovery against rx_clk need either a synchronizer clocked by rx_clk
+or an arrangement that holds reset until the first edge. This is in RTL, but it has to
+be reviewed against the fact that the clock can be stopped.
+
+Practical approach
+
+Wrap the XOR and the two capture flops in a small hard-macro-like module with its own constraints and layout rules, and keep the rest of the decoder as ordinary synchronous RTL on rx_clk. That keeps the physical-design risk in one place that you can review and re-verify after every layout change.
+

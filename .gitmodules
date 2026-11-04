@@ -1,0 +1,3 @@
+[submodule "common/pdk/saed90"]
+	path = common/pdk/saed90
+	url = git@github.com:viniciuskant/saed90.git

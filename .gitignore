@@ -27,5 +27,15 @@ result-*
 
 # Local-only folders (not part of the shared repo)
 Guides/
-sim/
 
+
+sim/claude
+sim/gemini
+tools/vcs/work
+tools/verilator/work
+.tmp/
+*.tmp
+out_data/
+alib-52/ 
+runs/
+run/
