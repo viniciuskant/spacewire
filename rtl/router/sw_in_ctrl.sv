@@ -1,8 +1,6 @@
 module sw_in_ctrl #(
     parameter int N_PORTS = 4,                   // portas físicas (2--31)
-    // verilator lint_off UNUSEDPARAM
     parameter int MY_PORT = 1                    // esta entrada (1--N)
-    // verilator lint_on UNUSEDPARAM
 )(
     input  logic clk,
     input  logic rst_n,                          // reset (0)
@@ -39,6 +37,7 @@ module sw_in_ctrl #(
     logic [PW-1:0] dest_q;     // destino (1--N)
     logic          del_hdr_q;  // apagar cabeçalho = 1
     logic          err_q;      // pulso de descarte
+    logic          eep_to_idle_q; // depois do ST_EEP: ST_IDLE = 1/ ST_SPILL = 0
 
     // cabeçalho
     logic [7:0]       addr;      // frente da fifo
@@ -58,6 +57,8 @@ module sw_in_ctrl #(
     // destino
     logic [N_PORTS:1] dest_sel;   // one-hot de dest_q
     logic             dest_full;  // saída de destino cheia = 1
+    logic             dest_up;    // link de destino em Run = 1
+    logic             my_link_up; // link desta entrada em Run = 1
     logic             xfer;       // copia palavra neste ciclo = 1
 
     // one-hot por comparação: candidato 0 ou > N vira zero (índice seguro)
@@ -69,8 +70,10 @@ module sw_in_ctrl #(
     end
 
     assign hdr_ok    = |(cand_sel & link_run_i);
-    assign dest_full = |(dest_sel & out_full_i);
-    assign xfer      = gnt_i && !in_empty_i && !dest_full;
+    assign dest_full  = |(dest_sel & out_full_i);
+    assign dest_up    = |(dest_sel & link_run_i);
+    assign my_link_up = link_run_i[MY_PORT];
+    assign xfer       = gnt_i && !in_empty_i && !dest_full && dest_up;  // destino caiu: não copia
 
     // saídas
     always_comb begin
@@ -82,14 +85,18 @@ module sw_in_ctrl #(
             ST_IDLE:  in_rd_en_o = !in_empty_i && (is_mark || !hdr_ok); // marcador sozinho ou erro
             ST_REQ: begin
                 req_o      = dest_sel;
-                in_rd_en_o = gnt_i && del_hdr_q;  // apaga cabeçalho
+                in_rd_en_o = gnt_i && del_hdr_q && dest_up;  // apaga cabeçalho/ caiu: ST_SPILL apaga
             end
             ST_SEND: begin
                 req_o      = dest_sel;
                 in_rd_en_o = xfer;
                 wvalid_o   = xfer;
             end
-            // ST_EEP: Parte 4
+            ST_EEP: begin
+                req_o    = dest_sel;               // segura a saída até gravar o EEP
+                wvalid_o = gnt_i && !dest_full;
+                wdata_o  = 9'h101;                 // EEP
+            end
             ST_SPILL: in_rd_en_o = !in_empty_i;
             default:  ;
         endcase
@@ -101,6 +108,7 @@ module sw_in_ctrl #(
             dest_q    <= '0;
             del_hdr_q <= 1'b0;
             err_q     <= 1'b0;
+            eep_to_idle_q <= 1'b0;
         end else begin
             err_q <= 1'b0;
             case (state)
@@ -118,10 +126,30 @@ module sw_in_ctrl #(
                     end
                 end
                 // req
-                ST_REQ:   if (gnt_i) state <= ST_SEND;
+                ST_REQ: begin
+                    if (!dest_up) begin            // destino caiu (descarta)
+                        err_q <= 1'b1;
+                        state <= ST_SPILL;
+                    end else if (gnt_i) begin
+                        state <= ST_SEND;
+                    end
+                end
                 // send
-                ST_SEND:  if (xfer && is_mark) state <= ST_IDLE;
-                // ST_EEP: Parte 4
+                ST_SEND: begin
+                    if (!dest_up) begin            // destino caiu (fecha com EEP e descarta resto)
+                        err_q         <= 1'b1;
+                        eep_to_idle_q <= 1'b0;
+                        state         <= ST_EEP;
+                    end else if (!my_link_up && in_empty_i) begin  // entrada caiu e o resto se perdeu
+                        err_q         <= 1'b1;
+                        eep_to_idle_q <= 1'b1;
+                        state         <= ST_EEP;
+                    end else if (xfer && is_mark) begin
+                        state <= ST_IDLE;
+                    end
+                end
+                // eep
+                ST_EEP:   if (gnt_i && !dest_full) state <= eep_to_idle_q ? ST_IDLE : ST_SPILL;
                 // spill
                 ST_SPILL: if (!in_empty_i && is_mark) state <= ST_IDLE;
                 default:  state <= ST_IDLE;
