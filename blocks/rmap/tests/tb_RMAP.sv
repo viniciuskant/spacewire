@@ -1,8 +1,6 @@
 `timescale 1ns / 1ps
 
 module tb_RMAP;
-
-    // Sinais do DUT
     logic clk;
     logic rst_n;
 
@@ -18,9 +16,16 @@ module tb_RMAP;
     logic [31:0] reg_bank_r_data;
     logic [8:0] reg_bank_r_addr;
     logic reg_bank_r_en;
-    logic init_busy;
+    logic busy;
 
-    // Instância do DUT
+    // banco de registradores simulado
+    logic [31:0] reg_mem [0:511];
+
+    // para guardar e imprimir as respostas.
+    logic [7:0] reply_buf [0:255];
+
+    integer i;
+
     RMAP dut (
         .clk(clk),
         .rst_n(rst_n),
@@ -34,236 +39,303 @@ module tb_RMAP;
         .reg_bank_r_data(reg_bank_r_data),
         .reg_bank_r_addr(reg_bank_r_addr),
         .reg_bank_r_en(reg_bank_r_en),
-        .init_busy(init_busy)
+        .busy(busy)
     );
 
-    // Geração do Clock (100MHz)
     initial begin
-        clk = 0;
+        clk = 1'b0;
         forever #5 clk = ~clk;
     end
 
-    // Função para calcular o CRC-8 (Padrão RMAP: Polinômio 0x07, Init 0x00)
-    function automatic [7:0] calc_crc8(input [7:0] seed, input [7:0] data);
-        logic [7:0] c;
-        c = seed ^ data;
-        for (int i = 0; i < 8; i++) begin
-            if (c[7])
-                c = (c << 1) ^ 8'h07;
-            else
-                c = (c << 1);
+
+    always_ff @(posedge clk) begin
+        if (reg_bank_r_en)
+            reg_bank_r_data = reg_mem[reg_bank_r_addr];
+        else
+            reg_bank_r_data = 32'h00000000;
+    end
+
+    always_ff @(posedge clk) begin
+        if (!rst_n) begin
+            for (integer k = 0; k < 512; k = k + 1)
+                reg_mem[k] <= 32'h00000000;
+        end else if (reg_bank_w_en) begin
+            reg_mem[reg_bank_w_addr] <= reg_bank_w_data;
+            $display("[TB][REG] WRITE addr_bus=0x%03h data=0x%08h", reg_bank_w_addr, reg_bank_w_data);
         end
-        return c;
+    end
+
+    function automatic logic [7:0] calc_crc8(input logic [7:0] seed, input logic [7:0] data);
+        logic [7:0] c;
+        begin
+            c = seed ^ data;
+            for (integer j = 0; j < 8; j = j + 1) begin
+                if (c[7])
+                    c = (c << 1) ^ 8'h07;
+                else
+                    c = c << 1;
+            end
+            return c;
+        end
     endfunction
 
-    task send_byte(input logic [8:0] data);
+    task automatic send_byte(input logic [8:0] data);
+        @(posedge clk);
+        // #1;
+        rx_valid <= 1'b1;
+        rx_data <= data;
+    endtask
+
+    logic [7:0] source_path_base;
+    task automatic send_header(
+        input  logic [7:0]  instruction,
+        input  logic [15:0] transaction_id,
+        input  logic [31:0] address,
+        input  logic [23:0] data_length,
+        output logic [7:0]  header_crc
+    );
+        logic [7:0] b;
         begin
-            @(negedge clk);
-            rx_data = data;
-            rx_valid = 1'b1;
-            @(posedge clk);
-            @(negedge clk);
+            header_crc = 8'h00;
+
+            b = 8'hFE; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+            b = 8'h01; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+            b = instruction; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+            b = 8'hAA; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+            
+            source_path_base = 8'h20;
+            for (int i = 0; i < instruction[1:0]; i++) begin
+                b = source_path_base + (4*i) + 0; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+                b = source_path_base + (4*i) + 1; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+                b = source_path_base + (4*i) + 2; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+                b = source_path_base + (4*i) + 3; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+            end
+
+            b = 8'h30; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+
+            b = transaction_id[15:8];
+            send_byte({1'b0, b});
+            header_crc = calc_crc8(header_crc, b);
+
+            b = transaction_id[7:0];
+            send_byte({1'b0, b});
+            header_crc = calc_crc8(header_crc, b);
+
+            b = 8'h00; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b); // Extended address
+
+            b = address[31:24]; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+            b = address[23:16]; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+            b = address[15:8]; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+            b = address[7:0]; send_byte({1'b0, b}); header_crc = calc_crc8(header_crc, b);
+
+            b = data_length[23:16];
+            send_byte({1'b0, b});
+            header_crc = calc_crc8(header_crc, b);
+
+            b = data_length[15:8];
+            send_byte({1'b0, b});
+            header_crc = calc_crc8(header_crc, b);
+
+            b = data_length[7:0];
+            send_byte({1'b0, b});
+            header_crc = calc_crc8(header_crc, b);
+
+            send_byte({1'b0, header_crc});
+        end
+    endtask
+
+
+    task automatic wait_reply(input string test_name);
+        integer cycles;
+        integer count;
+        logic eop_seen;
+        begin
+            cycles   = 0;
+            count    = 0;
+            eop_seen = 1'b0;
+
+            $display("[TB] Aguardando resposta: %s", test_name);
+
+            while (!eop_seen && cycles < 10000) begin
+                @(negedge clk);
+                cycles = cycles + 1;
+
+                if (tx_valid == 1'b1) begin
+                    if (tx_data[8] == 1'b1) begin
+                        eop_seen = 1'b1;
+                        $display("[TB][RX] EOP da resposta: tx_data=0x%03h", tx_data);
+                    end else begin
+                        if (count < 256)
+                            reply_buf[count] = tx_data[7:0];
+
+                        $display("[TB][RX] resposta[%0d] = 0x%02h",
+                                 count, tx_data[7:0]);
+                        count = count + 1;
+                    end
+                end
+            end
+
+            if (!eop_seen) begin
+                $error("[TB] Timeout esperando a resposta de: %s", test_name);
+                $fatal(1);
+            end
+
+            if (count == 0) begin
+                $error("[TB] EOP recebido, mas nenhum byte de resposta foi capturado: %s",
+                       test_name);
+                $fatal(1);
+            end
+
+            $display("[TB] Resposta de '%s' recebida: %0d bytes + EOP.\n",
+                     test_name, count);
+        end
+    endtask
+
+    task automatic finish_command(input string test_name);
+        integer cycles;
+        begin
+            send_byte(9'h102); 
+            
+            @(posedge clk);    
+            rx_valid <= 1'b0;  
+            @(posedge clk);    
+
+            cycles = 0;
+            while ((dut.state !== dut.TX_SRC_PATH_ADDRESS) && cycles < 10000) begin
+                @(negedge clk);
+                cycles = cycles + 1;
+            end
+
+            if (dut.state !== dut.TX_SRC_PATH_ADDRESS) begin
+                $error("[TB] DUT nao chegou a TX_SRC_PATH_ADDRESS em: %s", test_name);
+                $fatal(1);
+            end
+
+            wait_reply(test_name);
+            repeat (2) @(posedge clk);
+        end
+    endtask
+
+    task automatic do_reset;
+        begin
+            rst_n = 1'b0;
             rx_valid = 1'b0;
-        end
-    endtask
+            rx_data = 9'h000;
 
-    // Task de Reset
-    task do_reset();
-        begin
-            rst_n <= 1'b0;
-            rx_valid <= 1'b0;
-            rx_data <= 8'h00;
-            repeat(3) @(posedge clk);
-            rst_n <= 1'b1;
+            repeat (3) @(negedge clk);
+            rst_n = 1'b1;
+
+            wait (busy == 1'b0);
             @(posedge clk);
-            wait (init_busy == 0)
-            @(posedge clk);
+            $display("[TB] Reset concluido.\n");
         end
     endtask
 
-    // Variáveis para o cálculo do CRC no testbench
-    logic [7:0] crc_h;
-    logic [7:0] crc_d;
-    logic [7:0] data_in;
-
-    // Task para testar o Read Single
-    task test_read_single();
+    task automatic test_write_reg(input logic [31:0] address, input logic [31:0] value, input logic [15:0] transaction_id);
+        logic [7:0] header_crc;
+        logic [7:0] data_crc;
+        logic [7:0] b;
         begin
-            $display("[TB] Iniciando Teste: Read Single");
-            crc_h = 8'h00;
-            
-            send_byte(9'h0FE); crc_h = calc_crc8(8'hFE, crc_h);
-            send_byte(9'h001); crc_h = calc_crc8(8'h01, crc_h);
-            send_byte(9'h048); crc_h = calc_crc8(8'h48, crc_h); // Packet Type, Cmd, Src Len
-            send_byte(9'h0AA); crc_h = calc_crc8(8'hAA, crc_h); // Destination Key
-            send_byte(9'h030); crc_h = calc_crc8(8'h30, crc_h); // Source Logical Address
-            send_byte(9'h012); crc_h = calc_crc8(8'h12, crc_h); // Transaction ID MS
-            send_byte(9'h034); crc_h = calc_crc8(8'h34, crc_h); // Transaction ID LS
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Extended Address
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h004); crc_h = calc_crc8(8'h04, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Data Length MS
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Data Length
-            send_byte(9'h004); crc_h = calc_crc8(8'h04, crc_h); // Data Length LS
-            
-            send_byte(crc_h); // Header CRC
+            $display("[TB] WRITE addr=0x%08h data=0x%08h", address, value);
+
+            send_header(8'h79, transaction_id, address, 24'd4, header_crc);
+
+            data_crc = 8'h00;
+            b = value[31:24]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
+            b = value[23:16]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
+            b = value[15:8]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
+            b = value[7:0]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
+            send_byte({1'b0, data_crc});
+
+            finish_command($sformatf("WRITE 0x%08h", address));
         end
     endtask
 
-    // Task para testar o Read Incrementing
-    task test_read_inc();
+    task automatic test_read(
+        input string test_name,
+        input logic [7:0] instruction,
+        input logic [31:0] address,
+        input logic [23:0] data_length,
+        input logic [15:0] transaction_id
+    );
+        logic [7:0] header_crc;
         begin
-            $display("[TB] Iniciando Teste: Read Incrementing");
-            crc_h = 8'h00;
-            
-            send_byte(9'h0FE); crc_h = calc_crc8(8'hFE, crc_h);
-            send_byte(9'h001); crc_h = calc_crc8(8'h01, crc_h);
-            send_byte(9'h04C); crc_h = calc_crc8(8'h4C, crc_h); // Packet Type: 01, Command: 0011 (Read Inc), Src Len: 00
-            send_byte(9'h0AA); crc_h = calc_crc8(8'hAA, crc_h); // Destination Key
-            send_byte(9'h030); crc_h = calc_crc8(8'h30, crc_h); // Source Logical Address
-            send_byte(9'h016); crc_h = calc_crc8(8'h16, crc_h); // Transaction ID MS
-            send_byte(9'h080); crc_h = calc_crc8(8'h80, crc_h); // Transaction ID LS
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Extended Address
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h001); crc_h = calc_crc8(8'h01, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Data Length MS
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Data Length
-            send_byte(9'h004); crc_h = calc_crc8(8'h04, crc_h); // Data Length LS
-            send_byte(crc_h); // Header CRC
+            $display("[TB] %s addr=0x%08h length=%0d",
+                     test_name, address, data_length);
+
+            send_header(instruction, transaction_id, address,
+                        data_length, header_crc);
+
+            finish_command(test_name);
         end
     endtask
 
-    // Task para testar o Read Modify Write
-    task test_rmw();
+    task automatic test_rmw(
+        input logic [31:0] address,
+        input logic [31:0] data_value,
+        input logic [31:0] mask_value,
+        input logic [15:0] transaction_id
+    );
+        logic [7:0] header_crc;
+        logic [7:0] data_crc;
+        logic [7:0] b;
         begin
-            $display("[TB] Iniciando Teste: Read Modify Write");
-            crc_h = 8'h00;
-            crc_d = 8'h00;
-            
-            send_byte(9'h0FE); crc_h = calc_crc8(8'hFE, crc_h);
-            send_byte(9'h001); crc_h = calc_crc8(8'h01, crc_h);
-            send_byte(9'h05C); crc_h = calc_crc8(8'h5C, crc_h); // Packet Type: 01, Command: 0111 (RMW), Src Len: 00
-            send_byte(9'h0AA); crc_h = calc_crc8(8'hAA, crc_h); // Destination Key
-            send_byte(9'h030); crc_h = calc_crc8(8'h30, crc_h); // Source Logical Address
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Transaction ID MS
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Transaction ID LS
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Extended Address
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h004); crc_h = calc_crc8(8'h04, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Data Length MS
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Data Length
-            send_byte(9'h008); crc_h = calc_crc8(8'h08, crc_h); // Data Length LS
-            send_byte(crc_h); // Header CRC
+            $display("[TB] RMW addr=0x%08h data=0x%08h mask=0x%08h",
+                     address, data_value, mask_value);
 
-            // Data e Mask
-            send_byte(9'h011); crc_d = calc_crc8(8'h11, crc_d);
-            send_byte(9'h022); crc_d = calc_crc8(8'h22, crc_d);
-            send_byte(9'h033); crc_d = calc_crc8(8'h33, crc_d);
-            send_byte(9'h044); crc_d = calc_crc8(8'h44, crc_d);
-            send_byte(9'h0FF); crc_d = calc_crc8(8'hFF, crc_d);
-            send_byte(9'h0FF); crc_d = calc_crc8(8'hFF, crc_d);
-            send_byte(9'h0FF); crc_d = calc_crc8(8'hFF, crc_d);
-            send_byte(9'h0FF); crc_d = calc_crc8(8'hFF, crc_d);
-            send_byte(crc_d); // Data/Mask CRC
+            send_header(8'h5C, transaction_id, address, 24'd8, header_crc);
+
+            data_crc = 8'h00;
+            b = data_value[31:24]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
+            b = data_value[23:16]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
+            b = data_value[15:8]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
+            b = data_value[7:0]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
+
+            b = mask_value[31:24]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
+            b = mask_value[23:16]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
+            b = mask_value[15:8]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
+            b = mask_value[7:0]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
+            send_byte({1'b0, data_crc});
+
+            finish_command($sformatf("RMW 0x%08h", address));
         end
     endtask
 
-    // Task para testar o Write
-    task test_write();
-        begin
-            $display("[TB] Iniciando Teste: Write");
-            crc_h = 8'h00;
-            crc_d = 8'h00;
-            
-            send_byte(9'h0FE); crc_h = calc_crc8(8'hFE, crc_h);
-            send_byte(9'h001); crc_h = calc_crc8(8'h01, crc_h);
-            send_byte(9'h078); crc_h = calc_crc8(8'h78, crc_h); // Packet Type: 01, Command: 1110 (Write), Src Len: 00
-            send_byte(9'h0AA); crc_h = calc_crc8(8'hAA, crc_h); // Destination Key
-            send_byte(9'h030); crc_h = calc_crc8(8'h30, crc_h); // Source Logical Address
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Transaction ID MS
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Transaction ID LS
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Extended Address
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Target Addr
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Data Length MS
-            send_byte(9'h000); crc_h = calc_crc8(8'h00, crc_h); // Data Length
-            send_byte(9'h004); crc_h = calc_crc8(8'h04, crc_h); // Data Length LS
-            send_byte(crc_h); // Header CRC
-
-            // Data
-            send_byte(9'h0AA); crc_d = calc_crc8(8'hAA, crc_d);
-            send_byte(9'h0BB); crc_d = calc_crc8(8'hBB, crc_d);
-            send_byte(9'h0CC); crc_d = calc_crc8(8'hCC, crc_d);
-            send_byte(9'h0DD); crc_d = calc_crc8(8'hDD, crc_d);
-            send_byte(crc_d); // Data CRC
-        end
-    endtask
-
-    // Bloco principal de testes
     initial begin
         $dumpfile("waves/tb_RMAP.vcd");
         $dumpvars(0, tb_RMAP);
 
-        // Inicializa sinais
         rst_n = 1'b0;
         rx_valid = 1'b0;
-        rx_data = 8'h00;
-
-        // Simula a Destination Key salva no banco de registradores
-        force reg_bank_r_data = 32'hAA; 
+        rx_data = 9'h000;
 
         do_reset();
 
-        // 1. Teste Read Single
-        test_read_single();
-        wait(dut.state == dut.EOP_STATE);
-        $display("[TB] Estado EOP_STATE atingido - Read Single OK");
+        // Dois WRITEs em palavras consecutivas
+        test_write_reg(32'h00000004, 32'h11223344, 16'h0001);
         
-        send_byte(9'h102); //EOP
-        repeat(10) @(posedge clk);
+        test_write_reg(32'h00000008, 32'h55667788, 16'h0002);
 
+        // READ SINGLE do primeiro endereço
+        test_read("READ SINGLE", 8'h48, 32'h00000004, 24'd4, 16'h0003);
 
-        // 2. Teste Read Incrementing
-        test_read_inc();
-        wait(dut.state == dut.EOP_STATE);
-        $display("[TB] Estado EOP_STATE atingido - Read Incrementing OK");
-        
-        send_byte(9'h102); //EOP
-        repeat(10) @(posedge clk);
+        // READ INCREMENTING dos dois endereços
+        test_read("READ INCREMENTING", 8'h4C, 32'h00000004, 24'd8, 16'h0004);
 
-        // 3. Teste Read Modify Write
-        test_rmw();
-        wait(dut.state == dut.EOP_STATE);
-        $display("[TB] Estado EOP_STATE atingido - Read Modify Write OK");
-        
-        send_byte(9'h102); //EOP
-        repeat(10) @(posedge clk);
+        // RMW
+        test_rmw(32'h00000008, 32'hAABBCCDD, 32'hFFFFFFFF, 16'h0005);
 
-        // 4. Teste Write
-        test_write();
-        wait(dut.state == dut.EOP_STATE);
-        $display("[TB] Estado EOP_STATE atingido - Write OK");
-        
-        send_byte(9'h102); //EOP
-        repeat(10) @(posedge clk);
+        // READ SINGLE do RMW
+        test_read("READ SINGLE apos RMW", 8'h48, 32'h00000008, 24'd4, 16'h0006);
 
-        $display("[TB] Todos os testes finalizados.");
+        $display("[TB] Todos os testes da sequencia foram finalizados.");
         $finish;
     end
 
-    // Timeout global para evitar travamento na simulação
     initial begin
-        #50000;
-        $display("[TB] ERRO: Timeout da simulação. O estado EOP_STATE não foi atingido.");
-        $finish;
+        #100000;
+        $error("[TB] Timeout global da simulacao.");
+        $fatal(1);
     end
 
 endmodule

@@ -5,8 +5,9 @@ module rmap_crc8 (
     output logic [7:0] crc_out,
     input valid
 );
-    always_ff @(posedge clk) begin
-        if (valid) begin
+    always_comb begin
+    // always_ff @(posedge clk) begin
+        if (!clk & valid) begin
             crc_out[0] <= crc_in[0] ^ crc_in[6] ^ crc_in[7] ^ data_in[0] ^ data_in[6] ^ data_in[7];
             crc_out[1] <= crc_in[0] ^ crc_in[1] ^ crc_in[6] ^ data_in[0] ^ data_in[1] ^ data_in[6];
             crc_out[2] <= crc_in[0] ^ crc_in[1] ^ crc_in[2] ^ crc_in[6] ^ data_in[0] ^ data_in[1] ^ data_in[2] ^ data_in[6];
