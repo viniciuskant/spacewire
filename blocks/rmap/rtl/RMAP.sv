@@ -440,7 +440,8 @@ module RMAP (
                 RX_EOP_STATE: begin // TODO incompleto, não esquever de verificar se de fato chega um EOP
                     if (rx_valid_reg) begin
                         if (rx_data_reg == EOP_PACKET) begin
-                            next_state = TX_SRC_PATH_ADDRESS;
+                            if (rx_src_path_valid_len == '0) next_state = TX_SRC_LOGICAL_ADDRESS;
+                            else next_state = TX_SRC_PATH_ADDRESS;
                             rx_error_code = 4'h0;
                         end else begin 
                             next_state = RX_ERROR_STATE;
@@ -457,7 +458,7 @@ module RMAP (
                     busy = 1'b1;
                     tx_valid = 1'b1;
                     tx_data = {1'b0, bank_src_path_addr[tx_cnt_src_path_addr]};
-                    if (tx_cnt_src_path_addr == tx_reg_src_path_addr_valid_len) next_state = TX_SRC_LOGICAL_ADDRESS;
+                    if (tx_cnt_src_path_addr == tx_reg_src_path_addr_valid_len - 1) next_state = TX_SRC_LOGICAL_ADDRESS;
                 end
 
                 TX_SRC_LOGICAL_ADDRESS: begin
