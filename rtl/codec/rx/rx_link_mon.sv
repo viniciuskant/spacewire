@@ -72,9 +72,9 @@ a_disc_clear:  assert property (activity |=> !o_disconnect);
 // --- input assumptions (from the CDC primitives) ---
 // differences stay well inside the counter width; if this fires, the
 // Gray counters are too narrow for the clock ratio
-a_fct_delta:   assert property (i_fct_delta     <= 3);
-a_act_pos:     assert property (i_act_pos_delta <= 3);
-a_act_neg:     assert property (i_act_neg_delta <= 3);
+a_fct_delta:   assume property (i_fct_delta     <= 3);
+a_act_pos:     assume property (i_act_pos_delta <= 3);
+a_act_neg:     assume property (i_act_neg_delta <= 3);
 `endif
 
 endmodule

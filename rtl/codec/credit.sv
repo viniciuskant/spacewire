@@ -1,3 +1,4 @@
+import spw_pkg::*;
 
 // Credit counter for flow-control
 module credit
@@ -15,7 +16,7 @@ module credit
     input i_tx_fct_accept,
     // from RX, number of received FCTs since last system cycle, tx_credit + 8 * delta
     input [3:0] i_rx_fct_delta,
-    // from RX, if it received an FCT, rx_redit - 1
+    // from RX, if it received an FCT, rx_credit - 1
     input i_rx_got_nchar,
     // RX fifo occupancy, for `fct_due`
     input [$clog2(FIFO_DEPTH):0] i_rx_fifo_count,

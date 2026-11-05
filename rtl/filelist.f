@@ -19,4 +19,5 @@ rtl/codec/rx/rx_decoder.sv
 rtl/codec/rx/rx_clk_rec.sv
 rtl/codec/rx/rx_ds_capture.sv
 rtl/codec/rx/rx_link_mon.sv
+rtl/codec/rx/rx_buffer_wr.sv
 rtl/codec/rx/rx.sv
