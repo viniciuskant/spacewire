@@ -1,29 +1,10 @@
-
 // 2-FF synchronizer
-module sync_2ff (
-    input  clk_dest,      // Destination clock
-    input  rst_n,
-    input  async_data,    // Asynchronous input
-    output sync_data      // Synchronized output
-);
 
-    (* async_reg = "true" *) logic sync_ff1;
-    (* async_reg = "true" *) logic sync_ff2;
-
-    always_ff @(posedge clk_dest or negedge rst_n) begin
-        if (!rst_n) begin
-            sync_ff1 <= 1'b0;
-            sync_ff2 <= 1'b0;
-        end else begin
-            sync_ff1 <= async_data;   // May go metastable
-            sync_ff2 <= sync_ff1;     // Very unlikely to be metastable
-        end
-    end
-
-    assign sync_data = sync_ff2;
-endmodule
-
-module sync_gray_ctr #(parameter WIDTH=2)
+// Outputs the number of events in the write clock between
+// two samples of the read clock. The parameter WIDTH must
+// be wide enough to accommodate the maximum number of events
+// that can happen between two read cycles.
+module sync_gray_counter #(parameter WIDTH=2)
 (
     // write clock, reset and inputs
     input i_w_clk,
@@ -32,11 +13,15 @@ module sync_gray_ctr #(parameter WIDTH=2)
     // read clock
     input i_r_clk,
     input i_r_rstn,
-    // gray value synchronized to read clock
-    output [WIDTH-1:0] o_rgray
+    // difference of events between two read clocks
+    output [WIDTH-1:0] o_delta
 );
     logic [WIDTH-1:0] bin;
     logic [WIDTH-1:0] gray;
+
+    logic [WIDTH-1:0] read_bin_prev;
+    logic [WIDTH-1:0] read_bin_curr;
+
     (* async_reg = "true" *) logic [WIDTH-1:0] gray_ff1;
     (* async_reg = "true" *) logic [WIDTH-1:0] gray_ff2;
 
@@ -56,12 +41,20 @@ module sync_gray_ctr #(parameter WIDTH=2)
         if (!i_r_rstn) begin 
             gray_ff1 <= 0;
             gray_ff2 <= 0;
+            read_bin_prev <= 0;
         end else begin
             gray_ff1 <= gray;
             gray_ff2 <= gray_ff1;
+            read_bin_prev <= read_bin_curr;
         end
     end
-    assign o_rgray = gray_ff2;
 
+    always_comb begin
+        read_bin_curr[WIDTH-1] = gray_ff2[WIDTH-1];
+        for (int i = WIDTH-2; i >= 0; --i) begin
+            read_bin_curr[i] = read_bin_curr[i+1] ^ gray_ff2[i];
+        end
+    end
 
+    assign o_delta = read_bin_curr - read_bin_prev;
 endmodule

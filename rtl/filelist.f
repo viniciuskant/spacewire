@@ -1,30 +1,20 @@
-+incdir+rtl/include
-rtl/cdc_sync.sv
-rtl/afifo.sv
-rtl/fifo.sv
-rtl/credit.sv
 
-rtl/cdc_sys_tx.sv
+rtl/spw_pkg.sv
 
-rtl/spw_char_decode.sv
+rtl/common/async_fifo.sv
+rtl/common/sync_2ff.sv
+rtl/common/sync_gray_counter.sv
+rtl/common/fifo.sv
 
-rtl/flow_control_rx.sv
-rtl/flow_control_tx.sv
-rtl/flow_control.sv
+rtl/codec/tx/cdc_sys_tx.sv
+rtl/codec/tx/tx_enable_gen.sv
+rtl/codec/tx/tx_selector.sv
+rtl/codec/tx/tx_serializer.sv
+rtl/codec/tx/tx_spill.sv
+rtl/codec/tx/tx_timecode_slot.sv
+rtl/codec/tx/tx.sv
 
-rtl/rx_signal.sv
-rtl/rx_char.sv
-rtl/rx.sv
-
-rtl/tx_timecode_slot.sv
-rtl/tx_spill.sv
-rtl/tx_selector.sv
-rtl/tx_serializer.sv
-rtl/tx_ds_encoder.sv
-rtl/tx_enable_gen.sv
-rtl/tx.sv
-
-rtl/error_cleanup_fsm.sv
-rtl/state_machine.sv
-
-rtl/codec.sv
+rtl/codec/rx/cdc_sys_rx.sv
+rtl/codec/rx/rx_clk_rec.sv
+rtl/codec/rx/rx_ds_decoder.sv
+rtl/codec/rx/rx.sv

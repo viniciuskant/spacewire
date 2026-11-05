@@ -36,7 +36,7 @@ module credit
         if (!i_sys_rstn) begin
             tx_credits <= 0;
         end else if (i_fsm_link_reset) begin
-            tx_credits <= '0;
+            tx_credits <= 0;
         end else begin
         end
     end

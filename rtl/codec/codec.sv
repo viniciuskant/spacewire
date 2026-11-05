@@ -31,7 +31,7 @@ module codec #(
     input [7:0] time_in,
     input tick_in,
     output [7:0] time_out,
-    output tick_out,
+    output tick_out
 );
 
     localparam int DIV_10MHz = (REF_TX_FREQ_HZ / (2*CLK_FREQ));

@@ -1,6 +1,6 @@
 // DSIZE is the data width, ASIZE is the address width,
 // so the FIFO depth is 2^ASIZE.
-module afifo #(parameter DSIZE = 2, ASIZE = 4)
+module async_fifo #(parameter DSIZE = 2, ASIZE = 4)
 (
     input i_wclk,
     input i_wrst_n,

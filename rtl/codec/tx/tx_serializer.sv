@@ -1,4 +1,4 @@
-`include "tx_serializer_typ.svh"
+import spw_pkg::*;
 
 // Serializes NULLs/FCTs/NCHARs/TIMECODEs into
 // the spacewire protocol. The output is not yet
@@ -17,8 +17,8 @@ module tx_serializer (
     // EOP      = 001; 0x1
     // EEP      = 010; 0x2
     // FCT      = 011; 0x3
-    // NULL     = 100; 0x4
-    // TIMECODE = 101; 0x5
+    // TIMECODE = 100; 0x4
+    // NULL     = 101; 0x5
     input [2:0] payload_type,
     // only read if the payload type is DATA or TIMECODE
     input [7:0] payload,
@@ -31,18 +31,6 @@ module tx_serializer (
     // asserted when `data_out` is valid
     output valid_out
 );
-    // localparam [2:0] TYP_DATA = 0;
-    // localparam [2:0] TYP_EOP  = 1;
-    // localparam [2:0] TYP_EEP  = 2;
-    // localparam [2:0] TYP_FCT  = 3;
-    // localparam [2:0] TYP_NULL = 4;
-    // localparam [2:0] TYP_TC   = 5;
-
-    // character codes as defined per the spec
-    localparam [0:1] CODE_FCT  = 2'b00;
-    localparam [0:1] CODE_EOP  = 2'b01;
-    localparam [0:1] CODE_EEP  = 2'b10;
-    localparam [0:1] CODE_ESC  = 2'b11;
 
 
     // register for sending serialized bits
@@ -91,31 +79,31 @@ module tx_serializer (
         shift_size = 8;
         shift_value = 0;
         // first shift the ESC
-        shift_value[0:3] = {prev_xor, 1'b1, CODE_ESC};
+        shift_value[0:3] = {prev_xor, 1'b1, CODE_ESC[0], CODE_ESC[1]};
         // the FCT parity bit is 0 and the control flag is 1
         shift_value[4:7] = {2'b01, CODE_FCT};
         next_xor = ^CODE_FCT;
 
         if (valid) begin
             case (payload_type)
-                TYP_FCT: begin
+                PAYLOAD_FCT: begin
                     shift_size = 4;
                     // parity, control flag and control code
-                    shift_value[0:3] = {prev_xor, 1'b1, CODE_FCT};
+                    shift_value[0:3] = {prev_xor, 1'b1, CODE_FCT[1], CODE_FCT[0]};
                     next_xor = ^CODE_FCT;
                 end
-                TYP_EOP: begin
+                PAYLOAD_EOP: begin
                     shift_size = 4;
                     // parity, control flag and control code
-                    shift_value[0:3] = {prev_xor, 1'b1, CODE_EOP};
+                    shift_value[0:3] = {prev_xor, 1'b1, CODE_EOP[1], CODE_EOP[0]};
                     next_xor = ^CODE_EOP;
                 end
-                TYP_EEP: begin
+                PAYLOAD_EEP: begin
                     shift_size = 4;
-                    shift_value[0:3] = {prev_xor, 1'b1, CODE_EEP};
+                    shift_value[0:3] = {prev_xor, 1'b1, CODE_EEP[1], CODE_EEP[0]};
                     next_xor = ^CODE_EEP;
                 end
-                TYP_DATA: begin
+                PAYLOAD_DATA: begin
                     shift_size = 10;
                     shift_value[0] = !prev_xor;
                     // control flag = 0 for data characters
@@ -126,10 +114,10 @@ module tx_serializer (
                         shift_value[i+2] = payload[i];
                     end
                 end
-                TYP_TC: begin
+                PAYLOAD_TC: begin
                     shift_size = 14;
                     // first shift the ESC
-                    shift_value[0:3] = {prev_xor, 1'b1, CODE_ESC};
+                    shift_value[0:3] = {prev_xor, 1'b1, CODE_ESC[1], CODE_ESC[0]};
                     // the TC parity bit is 1 and the control flag is 0
                     shift_value[4:5] = 2'b10;
                     next_xor = ^payload;
@@ -141,9 +129,9 @@ module tx_serializer (
                 default: begin // TYP_NULL and unused codes
                     shift_size = 8;
                     // first shift the ESC
-                    shift_value[0:3] = {prev_xor, 1'b1, CODE_ESC};
+                    shift_value[0:3] = {prev_xor, 1'b1, CODE_ESC[1], CODE_ESC[0]};
                     // the FCT parity bit is 0 and the control flag is 1
-                    shift_value[4:7] = {2'b01, CODE_FCT};
+                    shift_value[4:7] = {2'b01, CODE_FCT[1], CODE_FCT[0]};
                     next_xor = ^CODE_FCT;
                 end
             endcase
@@ -157,6 +145,6 @@ module tx_serializer (
 
     `ifndef SYNTHESIS
     assert property (@(posedge clk) disable iff (!rst_n)
-        (boundary && valid) |-> payload_type inside {TYP_DATA, TYP_EOP, TYP_EEP, TYP_FCT, TYP_TC});
+        (boundary && valid) |-> payload_type inside {PAYLOAD_DATA, PAYLOAD_EOP, PAYLOAD_EEP, PAYLOAD_FCT, PAYLOAD_TC, PAYLOAD_NULL});
     `endif
 endmodule
