@@ -14,4 +14,12 @@ package spw_pkg;
         PAYLOAD_TC = 3'd4,
         PAYLOAD_NULL = 3'd5
     } e_payload_type;
+
+
+    parameter  int SYS_CLK_MHZ = 50;
+    // 6.4us * freq(MHz) = 64us * freq(MHz) / 10
+    localparam int T_6U4_CYCLES = (64 * SYS_CLK_MHZ) / 10;   // 320
+    localparam int T_12U8_CYCLES = T_6U4_CYCLES * 2;   // 640
+    // disconnect window = 850ns * freq(GHz) = 850ns * freq(MHz) / 1000
+    localparam int DISCONNECT_CYCLES = (850 * SYS_CLK_MHZ) / 1_000;   // 42
 endpackage

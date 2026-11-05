@@ -37,7 +37,7 @@ module cdc_sys_rx (
     input i_sys_rstn,
     input i_sys_enable_rx, // Enable RX from FSM. Must be registered to avoid glitches
 
-    output [3:0] o_fct_delta, // 3 bits, can have 2 FCTs in one system cycle
+    output [3:0] o_fct_delta, // 4 bits, can have 2 FCTs in one system cycle
     output [3:0] o_activity_pos_count, // how many RX clock rising edges since last system clock
     output [3:0] o_activity_neg_count, // how many RX clock falling edges since last system clock
     // separate signals for state-machine, sticky levels
