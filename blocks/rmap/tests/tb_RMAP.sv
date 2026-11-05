@@ -314,6 +314,9 @@ module tb_RMAP;
         
         test_write_reg(32'h00000008, 32'h55667788, 16'h0002);
 
+        // WRITE
+        test_write_reg(32'h0000000C, 32'h99AABBCC, 16'h00010);
+
         // READ SINGLE do primeiro endereço
         test_read("READ SINGLE", 8'h48, 32'h00000004, 24'd4, 16'h0003);
 
@@ -321,10 +324,10 @@ module tb_RMAP;
         test_read("READ INCREMENTING", 8'h4C, 32'h00000004, 24'd8, 16'h0004);
 
         // RMW
-        test_rmw(32'h00000008, 32'hAABBCCDD, 32'hFFFFFFFF, 16'h0005);
+        test_rmw(32'h0000000C, 32'hAABBCCDD, 32'hFFFFFFFF, 16'h0005);
 
         // READ SINGLE do RMW
-        test_read("READ SINGLE apos RMW", 8'h48, 32'h00000008, 24'd4, 16'h0006);
+        test_read("READ SINGLE apos RMW", 8'h48, 32'h0000000C, 24'd4, 16'h0006);
 
         $display("[TB] Todos os testes da sequencia foram finalizados.");
         $finish;

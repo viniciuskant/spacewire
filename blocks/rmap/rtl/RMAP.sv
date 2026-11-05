@@ -111,7 +111,7 @@ module RMAP (
         TX_EOP_STATE,
         TX_COMMAND_RMW_READ_STATE,
         TX_COMMAND_RMW_MODIFY_WRITE_STATE,
-        TX_COMMAND_RMW_DATA_STATE,
+        TX_COMMAND_RMW_STATE,
         TX_COMMAND_WRITE_STATE_REPLY_CRC
 
 
@@ -556,31 +556,27 @@ module RMAP (
                             next_state = TX_DATA_STATE; 
                             tx_reg_bank_r_en = 1'b1;
                         end
-                        CMD_READ_MODIFY_WRITE: next_state = TX_COMMAND_RMW_READ_STATE; 
+                        CMD_READ_MODIFY_WRITE: begin
+                            reg_bank_r_addr = tx_reg_bank_r_addr;
+                            reg_bank_r_en = 1'b1;
+                            next_state = TX_COMMAND_RMW_STATE; 
+                        end
                         default: next_state = TX_EOP_STATE;
                     endcase
                 end
 
-                TX_COMMAND_RMW_READ_STATE: begin
-                    busy = 1'b1;
-                    reg_bank_r_addr = tx_reg_bank_r_addr;
-                    reg_bank_r_en = 1'b1;
-                    next_state = TX_COMMAND_RMW_MODIFY_WRITE_STATE;
-                end
 
-                TX_COMMAND_RMW_MODIFY_WRITE_STATE: begin
-                    busy = 1'b1;
-                    reg_bank_w_addr = tx_reg_bank_r_addr;
-                    reg_bank_w_en = 1'b1;
-                    reg_bank_w_data = (rx_mask_write & rx_data_write) | ((~rx_mask_write) & reg_bank_r_data);
-                    next_state = TX_COMMAND_RMW_DATA_STATE;
-                end
-
-                TX_COMMAND_RMW_DATA_STATE: begin
+                TX_COMMAND_RMW_STATE: begin
                     busy = 1'b1;
                     tx_valid = 1'b1;
                     case (tx_cnt_data_byte) 
-                        2'b00: tx_data = {1'b0, tx_reg_rmw_data[31:24]};
+                        2'b00: begin
+                            reg_bank_w_addr = tx_reg_bank_r_addr;
+                            reg_bank_w_en = 1'b1;
+                            reg_bank_w_data = (rx_mask_write & rx_data_write) | ((~rx_mask_write) & reg_bank_r_data);
+
+                            tx_data = {1'b0, reg_bank_r_data[31:24]};
+                        end
                         2'b01: tx_data = {1'b0, tx_reg_rmw_data[23:16]};
                         2'b10: tx_data = {1'b0, tx_reg_rmw_data[15:8]};
                         2'b11: tx_data = {1'b0, tx_reg_rmw_data[7:0]};
@@ -801,6 +797,10 @@ module RMAP (
                     tx_crc_reg <= 8'h00;
                     if (tx_reg_command == CMD_READ_SINGLE || tx_reg_command == CMD_READ_INC) begin
                             tx_reg_bank_r_addr = tx_reg_bank_r_addr + 1;
+                    end else if  (tx_reg_command == CMD_READ_MODIFY_WRITE) begin
+                        tx_cnt_data_byte <= '0; // Reseta o contador de bytes
+                        tx_cnt_data <= '0;
+                        tx_reg_rmw_data <= reg_bank_r_data;
                     end
                 end
 
@@ -813,14 +813,8 @@ module RMAP (
                         reg_bank_r_data_reg <= reg_bank_r_data;
                     end
                 end
-                
-                TX_COMMAND_RMW_MODIFY_WRITE_STATE: begin
-                    tx_cnt_data_byte <= '0; // Reseta o contador de bytes
-                    tx_cnt_data <= '0;
-                    tx_reg_rmw_data <= reg_bank_r_data;
-                end
 
-                TX_COMMAND_RMW_DATA_STATE: begin
+                TX_COMMAND_RMW_STATE: begin
                     if (tx_cnt_data_byte == 2'b11) begin
                         tx_cnt_data_byte <= '0;
                         tx_cnt_data <= tx_cnt_data + 1;
