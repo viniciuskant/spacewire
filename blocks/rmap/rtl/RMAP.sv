@@ -108,12 +108,11 @@ module RMAP (
         TX_HEADER_CRC,
         TX_DATA_STATE,
         TX_DATA_CRC,
-        TX_REPLAY_CRC,
         TX_EOP_STATE,
         TX_COMMAND_RMW_READ_STATE,
         TX_COMMAND_RMW_MODIFY_WRITE_STATE,
         TX_COMMAND_RMW_DATA_STATE,
-        TX_COMMAND_WRITE_STATE
+        TX_COMMAND_WRITE_STATE_REPLY_CRC
 
 
     } state_t;
@@ -168,7 +167,7 @@ module RMAP (
 
 
     logic tx_reg_bank_r_en;
-    logic [8:0] tx_reg_bank_r_addr, tx_reg_bank_r_addr_next;
+    logic [8:0] tx_reg_bank_r_addr;
 
     logic [3:0] tx_cnt_src_path_addr;
     logic [3:0] tx_reg_src_path_addr_valid_len;
@@ -195,6 +194,7 @@ module RMAP (
         reg_bank_r_en = tx_reg_bank_r_en;
         rx_crc_valid = rx_valid_reg;
         busy = 1'b0;
+        tx_valid = 1'b0;
 
         if (rx_valid_reg && (rx_data_reg == EOP_PACKET) && (state != RX_EOP_STATE) && (state != TX_EOP_STATE)) begin
             next_state = RX_IDLE;
@@ -455,82 +455,106 @@ module RMAP (
 
                 TX_SRC_PATH_ADDRESS: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = {1'b0, bank_src_path_addr[tx_cnt_src_path_addr]};
                     if (tx_cnt_src_path_addr == tx_reg_src_path_addr_valid_len) next_state = TX_SRC_LOGICAL_ADDRESS;
                 end
 
                 TX_SRC_LOGICAL_ADDRESS: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = {1'b0, tx_reg_src_logical_addr};
                     next_state = TX_PROTOCOL_ID;
                 end
 
                 TX_PROTOCOL_ID: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = 8'h01;
                     next_state = TX_COMMAND_BYTE;
                 end
 
                 TX_COMMAND_BYTE: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = {1'b0, 2'b00, tx_reg_command, tx_reg_src_path_addr_len[3:2]};
                     next_state = TX_STATUS_STATE;
                 end
 
                 TX_STATUS_STATE: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = {4'h0, tx_status};
                     next_state = TX_DESTINATION_LOGICAL_ADDRESS;
                 end
 
                 TX_DESTINATION_LOGICAL_ADDRESS: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = 9'h0fe;
                     next_state = TX_TRANSACTION_ID_MS;
                 end
 
                 TX_TRANSACTION_ID_MS: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = tx_transaction_id[15:8];
                     next_state = TX_TRANSACTION_ID_LS;
                 end
 
                 TX_TRANSACTION_ID_LS: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = tx_transaction_id[7:0];
                     case(tx_reg_command)
                         CMD_READ_SINGLE: next_state = TX_RESERVED; 
                         CMD_READ_INC: next_state = TX_RESERVED; 
                         CMD_READ_MODIFY_WRITE: next_state = TX_RESERVED; 
-                        CMD_WRITE: next_state = TX_COMMAND_WRITE_STATE; 
+                        CMD_WRITE: next_state = TX_COMMAND_WRITE_STATE_REPLY_CRC; 
                         // TODO analisar se seria necessário um tratamento de erro
                     endcase
                 end 
 
                 TX_RESERVED: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = '0;
                     next_state = TX_DATA_LENGTH_MS;
                 end
 
                 TX_DATA_LENGTH_MS: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = tx_data_len[23:16];
                     next_state = TX_DATA_LENGTH;
                 end
 
                 TX_DATA_LENGTH: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = tx_data_len[15:8];
                     next_state = TX_DATA_LENGTH_LS;
                 end
 
                 TX_DATA_LENGTH_LS: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = tx_data_len[7:0];
                     next_state = TX_HEADER_CRC;
                 end
 
                 TX_HEADER_CRC: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = {1'b0, tx_crc_reg};
                     case(tx_reg_command)
                         CMD_READ_SINGLE: begin
                             next_state = TX_DATA_STATE; 
                             tx_reg_bank_r_en = 1'b1;
-                            tx_reg_bank_r_addr_next = tx_reg_bank_r_addr_next + 1;
                         end
                         CMD_READ_INC: begin
                             next_state = TX_DATA_STATE; 
                             tx_reg_bank_r_en = 1'b1;
-                            tx_reg_bank_r_addr_next = tx_reg_bank_r_addr + 1;
                         end
                         CMD_READ_MODIFY_WRITE: next_state = TX_COMMAND_RMW_READ_STATE; 
                         default: next_state = TX_EOP_STATE;
@@ -554,6 +578,13 @@ module RMAP (
 
                 TX_COMMAND_RMW_DATA_STATE: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    case (tx_cnt_data_byte) 
+                        2'b00: tx_data = {1'b0, tx_reg_rmw_data[31:24]};
+                        2'b01: tx_data = {1'b0, tx_reg_rmw_data[23:16]};
+                        2'b10: tx_data = {1'b0, tx_reg_rmw_data[15:8]};
+                        2'b11: tx_data = {1'b0, tx_reg_rmw_data[7:0]};
+                    endcase
                     if (tx_cnt_data == tx_data_words - 1 && tx_cnt_data_byte == 2'b11) begin
                         next_state = TX_DATA_CRC;
                     end
@@ -561,10 +592,16 @@ module RMAP (
 
                 TX_DATA_STATE: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    case (tx_cnt_data_byte) 
+                        2'b00: tx_data = {1'b0, reg_bank_r_data[31:24]};
+                        2'b01: tx_data = {1'b0, reg_bank_r_data_reg[23:16]};
+                        2'b10: tx_data = {1'b0, reg_bank_r_data_reg[15:8]};
+                        2'b11: tx_data = {1'b0, reg_bank_r_data_reg[7:0]};
+                    endcase
                     if (tx_cnt_data == tx_data_words - 1 && tx_cnt_data_byte == 2'b11) begin
                         next_state = TX_DATA_CRC;
                     end else if (tx_cnt_data_byte == 2'b11) begin
-                        tx_reg_bank_r_addr_next = tx_reg_bank_r_addr + 9'b1;
                         tx_reg_bank_r_en = 1'b1;
                     end else begin
                         tx_reg_bank_r_en = 1'b0; // Desativa após pedir
@@ -573,24 +610,25 @@ module RMAP (
 
                 TX_DATA_CRC: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = {1'b0, tx_crc_reg};
                     next_state = TX_EOP_STATE;
                 end
 
-                TX_COMMAND_WRITE_STATE: begin
+                TX_COMMAND_WRITE_STATE_REPLY_CRC: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = {1'b0, tx_crc_reg};
                     reg_bank_w_addr = tx_reg_bank_r_addr;
                     reg_bank_w_en = 1'b1;
                     reg_bank_w_data = rx_data_write;
-                    next_state = TX_REPLAY_CRC;
-                end 
-
-                TX_REPLAY_CRC: begin
-                    busy = 1'b1;
                     next_state = TX_EOP_STATE;
-                end
+                end 
 
                 TX_EOP_STATE: begin
                     busy = 1'b1;
+                    tx_valid = 1'b1;
+                    tx_data = EOP_PACKET;
                     next_state = RX_IDLE;
                 end
 
@@ -627,7 +665,6 @@ module RMAP (
 
             state <= next_state;
             rx_error_code_reg <= rx_error_code;
-            tx_valid <= 1'b0;
 
             if (rx_valid_reg) rx_crc_reg <= rx_crc_next;
             if (tx_valid) tx_crc_reg <= tx_crc_next;
@@ -756,91 +793,24 @@ module RMAP (
 
                 TX_SRC_PATH_ADDRESS: begin
                     if (tx_cnt_src_path_addr < tx_reg_src_path_addr_valid_len) begin
-                        tx_valid <= 1'b1;
-                        tx_data <= {1'b0, bank_src_path_addr[tx_cnt_src_path_addr]};
                         tx_cnt_src_path_addr <= tx_cnt_src_path_addr + 1;
                     end
                 end
 
-                TX_SRC_LOGICAL_ADDRESS: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= {1'b0, tx_reg_src_logical_addr};
-                end
-
-                TX_PROTOCOL_ID: begin 
-                    tx_valid <= 1'b1;
-                    tx_data <= 8'h01;
-                end
-
-                TX_COMMAND_BYTE: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= {1'b0, 2'b00, tx_reg_command, tx_reg_src_path_addr_len[3:2]};
-                end
-
-                TX_STATUS_STATE: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= {4'h0, tx_status};
-                end
-
-
-                TX_DESTINATION_LOGICAL_ADDRESS: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= 9'h0fe;
-                end
-
-                TX_TRANSACTION_ID_MS: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= tx_transaction_id[15:8];
-                end
-
-                TX_TRANSACTION_ID_LS: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= tx_transaction_id[7:0];
-                end
-
-                TX_RESERVED: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= '0;
-                end
-
-                TX_DATA_LENGTH_MS: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= tx_data_len[23:16];
-                end
-
-                TX_DATA_LENGTH: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= tx_data_len[15:8];
-                end
-
-                TX_DATA_LENGTH_LS: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= tx_data_len[7:0];
-                end
-
                 TX_HEADER_CRC: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= {1'b0, tx_crc_reg};
                     tx_crc_reg <= 8'h00;
+                    if (tx_reg_command == CMD_READ_SINGLE || tx_reg_command == CMD_READ_INC) begin
+                            tx_reg_bank_r_addr = tx_reg_bank_r_addr + 1;
+                    end
                 end
 
                 TX_DATA_STATE: begin
-                    tx_valid <= 1'b1;
-                    case (tx_cnt_data_byte) 
-                        2'b00: begin
-                            tx_data <= {1'b0, reg_bank_r_data[31:24]};
-                            reg_bank_r_data_reg <= reg_bank_r_data;
-                        end
-                        2'b01: tx_data <= {1'b0, reg_bank_r_data_reg[23:16]};
-                        2'b10: tx_data <= {1'b0, reg_bank_r_data_reg[15:8]};
-                        2'b11: tx_data <= {1'b0, reg_bank_r_data_reg[7:0]};
-                    endcase
+                    tx_cnt_data_byte <= tx_cnt_data_byte + 1;
                     if (tx_cnt_data_byte == 2'b11) begin
                         tx_cnt_data <= tx_cnt_data + 1;
-                        tx_reg_bank_r_addr <= tx_reg_bank_r_addr_next;
-                        tx_cnt_data_byte <= '0; // Reseta o contador de bytes
-                    end else begin
-                        tx_cnt_data_byte <= tx_cnt_data_byte + 1;
+                        tx_reg_bank_r_addr <= tx_reg_bank_r_addr + 9'b1;
+                    end else if (tx_cnt_data_byte == 2'b00) begin
+                        reg_bank_r_data_reg <= reg_bank_r_data;
                     end
                 end
                 
@@ -851,37 +821,12 @@ module RMAP (
                 end
 
                 TX_COMMAND_RMW_DATA_STATE: begin
-                    tx_valid <= 1'b1;
-                    case (tx_cnt_data_byte) 
-                        2'b00: tx_data <= {1'b0, tx_reg_rmw_data[31:24]};
-                        2'b01: tx_data <= {1'b0, tx_reg_rmw_data[23:16]};
-                        2'b10: tx_data <= {1'b0, tx_reg_rmw_data[15:8]};
-                        2'b11: tx_data <= {1'b0, tx_reg_rmw_data[7:0]};
-                    endcase
                     if (tx_cnt_data_byte == 2'b11) begin
                         tx_cnt_data_byte <= '0;
                         tx_cnt_data <= tx_cnt_data + 1;
                     end else begin
                         tx_cnt_data_byte <= tx_cnt_data_byte + 1;
                     end
-                end
-
-                TX_DATA_CRC: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= {1'b0, tx_crc_reg};
-                end
-
-                TX_REPLAY_CRC: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= {1'b0, tx_crc_reg};
-                end
-
-                TX_EOP_STATE: begin
-                    tx_valid <= 1'b1;
-                    tx_data <= EOP_PACKET;
-                end
-
-                RX_ERROR_STATE: begin
                 end
 
             endcase

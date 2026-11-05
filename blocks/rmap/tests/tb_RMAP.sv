@@ -51,8 +51,6 @@ module tb_RMAP;
     always_ff @(posedge clk) begin
         if (reg_bank_r_en)
             reg_bank_r_data = reg_mem[reg_bank_r_addr];
-        else
-            reg_bank_r_data = 32'h00000000;
     end
 
     always_ff @(posedge clk) begin
