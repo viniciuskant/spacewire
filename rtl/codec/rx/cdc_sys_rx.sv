@@ -127,7 +127,7 @@ sync_2ff fifo_overflow_2ff (
 
 wire nchar_empty;
 assign o_sys_nchar_valid = !nchar_empty;
-afifo #(.DSIZE(9), .ASIZE(3)) nchar_fifo (
+async_fifo #(.DSIZE(9), .ASIZE(3)) nchar_fifo (
     .i_wclk(i_rx_clk),
     .i_wrst_n(i_rx_hard_rstn),
     .i_wr(i_rx_nchar_wr),
@@ -142,7 +142,7 @@ afifo #(.DSIZE(9), .ASIZE(3)) nchar_fifo (
 
 wire tc_empty;
 assign o_sys_timecode_valid = !tc_empty;
-afifo #(.DSIZE(8), .ASIZE(2)) tc_fifo (
+async_fifo #(.DSIZE(8), .ASIZE(2)) tc_fifo (
     .i_wclk(i_rx_clk),
     .i_wrst_n(i_rx_hard_rstn),
     .i_wr(i_rx_timecode_wr),

@@ -15,6 +15,8 @@ rtl/codec/tx/tx_timecode_slot.sv
 rtl/codec/tx/tx.sv
 
 rtl/codec/rx/cdc_sys_rx.sv
+rtl/codec/rx/rx_decoder.sv
 rtl/codec/rx/rx_clk_rec.sv
-rtl/codec/rx/rx_ds_decoder.sv
+rtl/codec/rx/rx_ds_capture.sv
+rtl/codec/rx/rx_link_mon.sv
 rtl/codec/rx/rx.sv

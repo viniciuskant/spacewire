@@ -1,48 +1,20 @@
 module rx(
-    input logic clk,
-    input logic rst_n,
+    input i_sys_clk,
+    input i_sys_rstn,
 
-    // interface com outro codec
-    input logic D_in,
-    input logic S_in,
+    // fifo interface
+    input i_fifo_full,
+    output o_nchar_wr,
+    output [8:0] o_nchar,
 
-    // interface com a fifo
-    output logic [9:0] data_o,
-    output logic data_valid_o,
+    // timecode interface
+    output o_tick,
+    output [7:0] o_timecode,
 
-    // para a maquina de estado
-    output logic got_bit_o,
-    output logic parity_err_o,
-    output logic escape_err_o
+    // credit interface
+    output [3:0] fct_delta
 );
 
-    logic bit_valid;
-    logic bit_signal;
 
-    rx_signal u_rx_signal(
-        .clk(clk),
-        .rst_n(rst_n),
-
-        .D_in(D_in),
-        .S_in(S_in),
-
-        .bit_valid_o(bit_valid),
-        .bit_o(bit_signal)
-    );
-
-    rx_char u_rx_char (
-        .clk(clk),
-        .rst_n(rst_n),
-
-        .bit_valid_i(bit_valid),
-        .bit_i(bit_signal),
-
-        .data_o(data_o),
-        .data_valid_o(data_valid_o),
-
-        .got_bit_o(got_bit_o),
-        .parity_err_o(parity_err_o),
-        .escape_err_o(escape_err_o)
-    );
 
 endmodule
