@@ -7,6 +7,7 @@ rtl/common/sync_gray_counter.sv
 rtl/common/fifo.sv
 
 rtl/codec/tx/cdc_sys_tx.sv
+rtl/codec/tx/tx_ds_encoder.sv
 rtl/codec/tx/tx_enable_gen.sv
 rtl/codec/tx/tx_selector.sv
 rtl/codec/tx/tx_serializer.sv

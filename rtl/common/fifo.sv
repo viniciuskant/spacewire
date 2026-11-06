@@ -1,5 +1,10 @@
 // Synchronous FIFO with clockless read (first-word fall-through)
-module fifo #(parameter ASIZE = 2, DSIZE = 16) (
+module fifo
+#(
+    parameter ASIZE = 2, // address size (log2(DEPTH))
+    parameter DSIZE = 16 // word size
+)
+( 
   input                  i_clk,
   input                  i_rstn,
   input                  i_wr,
@@ -7,7 +12,8 @@ module fifo #(parameter ASIZE = 2, DSIZE = 16) (
   input      [DSIZE-1:0] i_wdata,
   output     [DSIZE-1:0] o_rdata,
   output                 o_empty,
-  output                 o_full
+  output                 o_full,
+  output     [ASIZE:0]   o_count
 );
 
 localparam int FIFO_SIZE = 1 << ASIZE;
@@ -17,6 +23,7 @@ reg [ASIZE:0]       wptr, rptr;        // One extra bit to count laps
 
 wire empty = (wptr == rptr);
 wire full = (wptr[ASIZE] != rptr[ASIZE]) && (wptr[ASIZE-1:0] == rptr[ASIZE-1:0]);
+assign o_count = wptr - rptr;
 
 always_ff @(posedge i_clk or negedge i_rstn) begin
     if (!i_rstn) begin 

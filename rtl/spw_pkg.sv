@@ -22,8 +22,8 @@ package spw_pkg;
     localparam int T_12U8_CYCLES = T_6U4_CYCLES * 2;   // 640
     // disconnect window = 850ns * freq(GHz) = 850ns * freq(MHz) / 1000
     localparam int DISCONNECT_CYCLES = (850 * SYS_CLK_MHZ) / 1_000;   // 42
-    localparam logic [6:0] MAX_CREDITS = 56;
-    localparam logic [6:0] FCT_GRANT   = 8;
+    localparam int MAX_CREDITS = 56;
+    localparam int FCT_GRANT   = 8;
 
     localparam logic [8:0] CONST_EOP = {1'b1, 8'b0};
     localparam logic [8:0] CONST_EEP = {1'b1, 8'b1};
