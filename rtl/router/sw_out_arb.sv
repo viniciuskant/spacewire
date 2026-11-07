@@ -30,7 +30,7 @@ module sw_out_arb #(
         found  = 1'b0;
         idx_p  = '0;
         for (int k = 1; k <= N_PORTS; k++) begin
-            // dá a volta (1..N); unsigned' evita 4 -> -4
+            // dá a volta (1..N); unsigned' evita 4 virar -4
             idx_p = PW'(unsigned'(((int'(last_q) - 1 + k) % N_PORTS) + 1));
             if (!found && req_i[idx_p]) begin
                 winner = idx_p;

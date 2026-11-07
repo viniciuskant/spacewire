@@ -20,7 +20,7 @@ module sw_crossbar #(
 
     localparam int PW = $clog2(N_PORTS + 1); // bits para n de porta
 
-    // generate com genvar (só por causa do icarus, testar dps)
+    // generate com genvar
     logic [N_PORTS:1][N_PORTS:1] dsel;   // [i][j]: dest_i[i] == j (0 ou > N: tudo zero)
     logic [N_PORTS:1][N_PORTS:1] ghit;   // [i][j]: destino j e árbitro j escolheu i
     logic [N_PORTS:1][N_PORTS:1] wsel;   // [j][i]: entrada i grava na saída j
@@ -29,13 +29,13 @@ module sw_crossbar #(
         for (genvar j = 1; j <= N_PORTS; j++) begin : g_out
             assign dsel[i][j]      = (dest_i[i] == PW'(j));
             assign ghit[i][j]      = dsel[i][j] && gnt_i[j][i];
-            assign req_col_o[j][i] = req_i[i][j];                          // linha -> coluna
+            assign req_col_o[j][i] = req_i[i][j];                          // linha para coluna
             assign wsel[j][i]      = wvalid_i[i] && gnt_in_o[i] && dsel[i][j];  // só o dono grava
         end
-        assign gnt_in_o[i] = |ghit[i];                                     // árbitro -> entrada
+        assign gnt_in_o[i] = |ghit[i];                                     // árbitro para entrada
     end
 
-    // dados: entrada -> saída
+    // dados: entrada para saída
     for (genvar j = 1; j <= N_PORTS; j++) begin : g_mux
         logic [8:0] masked [1:N_PORTS];   // palavra da entrada i se ela grava em j/ senão 0
         logic [8:0] mux;                  // OR de todas as masked

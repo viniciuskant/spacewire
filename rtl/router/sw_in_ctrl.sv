@@ -5,14 +5,14 @@ module sw_in_ctrl #(
     input  logic clk,
     input  logic rst_n,                          // reset (0)
 
-    // rx_fifo TODO: Padronizar a fifo com a do codec dps, fiz essa só para teste inicial
+    // rx_fifo
     input  logic [8:0]                     in_data_i,   // frente da rx_fifo
     input  logic                           in_empty_i,
     output logic                           in_rd_en_o,  // retira a frente = 1
 
     // tabela
-    input  logic                           tbl_hit_i,   // rota existe = 1
-    input  logic [$clog2(N_PORTS+1)-1:0]   tbl_port_i,  // porta da rota (1--N)
+    input  logic                           lookup_hit_i,  // rota existe = 1
+    input  logic [$clog2(N_PORTS+1)-1:0]   lookup_port_i, // porta da rota (1--N)
 
     input  logic [N_PORTS:1]               link_run_i,  // link em Run = 1
     input  logic [N_PORTS:1]               out_full_i,  // tx_fifo cheia = 1
@@ -51,8 +51,8 @@ module sw_in_ctrl #(
     assign addr    = in_data_i[7:0];
     assign is_mark = in_data_i[8];
     assign is_path = (addr >= 8'd1) && (addr <= 8'(N_PORTS));
-    assign is_log  = (addr >= 8'd32) && (addr <= 8'd254) && tbl_hit_i;
-    assign cand    = is_path ? PW'(addr) : (is_log ? tbl_port_i : '0);
+    assign is_log  = (addr >= 8'd32) && (addr <= 8'd254) && lookup_hit_i;
+    assign cand    = is_path ? PW'(addr) : (is_log ? lookup_port_i : '0);
 
     // destino
     logic [N_PORTS:1] dest_sel;   // one-hot de dest_q

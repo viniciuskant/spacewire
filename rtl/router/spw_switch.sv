@@ -42,14 +42,14 @@ module spw_switch #(
     logic [N_PORTS:1]           look_hit;
     logic [N_PORTS:1][PW-1:0]   look_port;
 
-    // entradas -> crossbar
+    // entradas para crossbar
     logic [N_PORTS:1]           ic_wvalid;
     logic [N_PORTS:1][8:0]      ic_wdata;
     logic [N_PORTS:1][PW-1:0]   ic_dest;
     logic [N_PORTS:1][N_PORTS:1] ic_req;     // linha i = req_o da entrada i
     logic [N_PORTS:1]           ic_gnt;      // gnt da entrada i
 
-    // crossbar <-> árbitros
+    // crossbar e árbitros
     logic [N_PORTS:1][N_PORTS:1] arb_req;    // linha j = pedidos para a saída j
     logic [N_PORTS:1][N_PORTS:1] arb_gnt;    // linha j = gnt_o do árbitro j
     // verilator lint_off UNUSEDSIGNAL
@@ -70,7 +70,7 @@ module spw_switch #(
         sw_in_ctrl #(.N_PORTS(N_PORTS), .MY_PORT(i)) u_in (
             .clk(clk), .rst_n(rst_n),
             .in_data_i(in_data_i[i]), .in_empty_i(in_empty_i[i]), .in_rd_en_o(in_rd_en_o[i]),
-            .tbl_hit_i(look_hit[i]), .tbl_port_i(look_port[i]),
+            .lookup_hit_i(look_hit[i]), .lookup_port_i(look_port[i]),
             .link_run_i(link_run_i), .out_full_i(out_full_i),
             .req_o(ic_req[i]), .gnt_i(ic_gnt[i]),
             .dest_o(ic_dest[i]), .wvalid_o(ic_wvalid[i]), .wdata_o(ic_wdata[i]),
