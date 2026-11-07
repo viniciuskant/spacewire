@@ -27,7 +27,7 @@ module cdc_sys_tx
 );
     logic fifo_full, fifo_empty;
     localparam int DSIZE = 11; // {type[2:0], payload[7:0]}
-    afifo #(DSIZE, ASIZE) fifo0 (
+    async_fifo #(DSIZE, ASIZE) fifo0 (
         .i_wclk(i_sys_clk),
         .i_wrst_n(i_sys_rstn),
         .i_wr(i_sys_wr_valid),

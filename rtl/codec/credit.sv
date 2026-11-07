@@ -86,8 +86,5 @@ a_tx_credit_bad: assert property (!$past(o_credit_error) |-> tx_credit <= MAX_CR
 // The FSM must leave connecting/run on the edge that samples the error
 a_err_exit: assert property (o_credit_error |=> !i_fct_allowed);
 a_fct_delta: assert property (i_rx_fct_delta <= 3);
-
-
 `endif
-
 endmodule

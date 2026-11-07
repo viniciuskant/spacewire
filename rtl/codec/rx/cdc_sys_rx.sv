@@ -1,5 +1,3 @@
-`default_nettype none
-
 module cdc_sys_rx (
     // ----- RX domain ----- 
     input i_rx_clk, // recovered rising edge
@@ -7,9 +5,6 @@ module cdc_sys_rx (
     // RX hard reset (global reset). Used to reset
     // CDC primitives.
     input i_rx_hard_rstn, 
-    // RX reset derived from global reset OR rx_enable.
-    // Feed this into the RX module rstn.
-    output o_rx_rstn, 
 
     // FSM signals, all sticky
     input i_rx_got_null, 
@@ -35,11 +30,10 @@ module cdc_sys_rx (
     // ----- System domain -----
     input i_sys_clk,
     input i_sys_rstn,
-    input i_sys_enable_rx, // Enable RX from FSM. Must be registered to avoid glitches
 
-    output [3:0] o_fct_delta, // 4 bits, can have 2 FCTs in one system cycle
-    output [3:0] o_activity_pos_count, // how many RX clock rising edges since last system clock
-    output [3:0] o_activity_neg_count, // how many RX clock falling edges since last system clock
+    output [3:0] o_sys_fct_delta, // 4 bits, can have 2 FCTs in one system cycle
+    output [3:0] o_sys_activity_pos_count, // how many RX clock rising edges since last system clock
+    output [3:0] o_sys_activity_neg_count, // how many RX clock falling edges since last system clock
     // separate signals for state-machine, sticky levels
     output o_sys_got_null,
     output o_sys_got_nchar,
@@ -57,9 +51,6 @@ module cdc_sys_rx (
     output o_sys_timecode_valid, // FIFO not empty
     output [7:0] o_sys_timecode
 );
-// asynchronous reset because the line is probably silent on error/initialization
-assign o_rx_rstn = i_sys_rstn && i_sys_enable_rx;
-
 
 sync_gray_counter #(.WIDTH(4)) fct_counter (
     .i_w_clk(i_rx_clk),
@@ -67,7 +58,7 @@ sync_gray_counter #(.WIDTH(4)) fct_counter (
     .i_inc(i_rx_inc_fct),
     .i_r_clk(i_sys_clk),
     .i_r_rstn(i_sys_rstn),
-    .o_delta(o_fct_delta)
+    .o_delta(o_sys_fct_delta)
 );
 // if RX is clocked, we got a bit, so
 // `i_inc` can be 1
@@ -77,7 +68,7 @@ sync_gray_counter #(.WIDTH(4)) activity_pos_counter (
     .i_inc(1'b1),
     .i_r_clk(i_sys_clk),
     .i_r_rstn(i_sys_rstn),
-    .o_delta(o_activity_pos_count)
+    .o_delta(o_sys_activity_pos_count)
 );
 sync_gray_counter #(.WIDTH(4)) activity_neg_counter (
     .i_w_clk(i_rx_clk_n),
@@ -85,7 +76,7 @@ sync_gray_counter #(.WIDTH(4)) activity_neg_counter (
     .i_inc(1'b1),
     .i_r_clk(i_sys_clk),
     .i_r_rstn(i_sys_rstn),
-    .o_delta(o_activity_neg_count)
+    .o_delta(o_sys_activity_neg_count)
 );
 
 sync_2ff got_null_2ff (

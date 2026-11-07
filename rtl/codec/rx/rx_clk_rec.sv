@@ -1,4 +1,3 @@
-`default_nettype none
 // module to recover clock signal from S and D.
 // TODO: properly constrain this module.
 module rx_clk_rec (

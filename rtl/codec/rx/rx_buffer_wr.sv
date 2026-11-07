@@ -66,7 +66,5 @@ a_one_eep: assert property (!i_rx_enable && o_buf_wr |=> !o_buf_wr);
 a_no_idle_wr: assert property (!i_rx_enable && !in_packet |=> !o_buf_wr);
 a_afifo_empty_on_enable: assert property ($rose(i_rx_enable) |-> !i_afifo_valid);
 `endif
-
 endmodule
-
 `undef ASSUME

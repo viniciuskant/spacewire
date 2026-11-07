@@ -9,30 +9,30 @@
 // generates (the D path must be shorter than the XOR + clock-tree path).
 // Keep d_in -> d_pos/d_neg free of logic and place these flops near the pads.
 module rx_ds_capture (
-    input  logic       rx_clk,      // from rx_clk_rec
-    input  logic       rx_rst_n,    // functional RX reset (async assert and release)
-    input  logic       d_in,        // D line, straight from the input pad
-    output logic [1:0] pair,
-    output logic       pair_valid
+    input  logic       i_rx_clk,      // from rx_clk_rec
+    input  logic       i_rx_rstn,    // functional RX reset (async assert and release)
+    input  logic       i_D,        // D line, straight from the input pad
+    output logic [1:0] o_pair,
+    output logic       o_pair_valid
 );
     logic d_pos;    // bit captured on the rising edge (earlier bit of a pair)
     logic d_neg;    // bit captured on the falling edge (later bit of a pair)
     logic primed;   // first rising-edge bit has been captured
 
-    always_ff @(negedge rx_clk or negedge rx_rst_n)
-        if (!rx_rst_n) d_neg <= 1'b0;
-        else           d_neg <= d_in;
+    always_ff @(negedge i_rx_clk or negedge i_rx_rstn)
+        if (!i_rx_rstn) d_neg <= 1'b0;
+        else            d_neg <= i_D;
 
-    always_ff @(posedge rx_clk or negedge rx_rst_n)
-        if (!rx_rst_n) begin
+    always_ff @(posedge i_rx_clk or negedge i_rx_rstn)
+        if (!i_rx_rstn) begin
             d_pos      <= 1'b0;
             primed     <= 1'b0;
-            pair       <= '0;
-            pair_valid <= 1'b0;
+            o_pair       <= '0;
+            o_pair_valid <= 1'b0;
         end else begin
-            d_pos      <= d_in;
+            d_pos      <= i_D;
             primed     <= 1'b1;
-            pair       <= {d_neg, d_pos};   // {later, earlier}
-            pair_valid <= primed;
+            o_pair       <= {d_neg, d_pos};   // {later, earlier}
+            o_pair_valid <= primed;
         end
 endmodule
