@@ -10,10 +10,10 @@ module sw_route_table #(
     input  logic [$clog2(N_PORTS+1)-1:0] tbl_port_i,  // output
     input  logic                       tbl_valid_i,   // 1 = rota válida/ 0 = apaga
 
-    // lookup
-    input  logic [N_PORTS:1][7:0]                   lookup_addr_i,  // endereço a consultar
-    output logic [N_PORTS:1]                        lookup_hit_o,   // rota existe(1)
-    output logic [N_PORTS:1][$clog2(N_PORTS+1)-1:0] lookup_port_o   // output/0 se não houver rota
+    // lookup (uma consulta por entrada, 0--N)
+    input  logic [N_PORTS:0][7:0]                   lookup_addr_i,  // endereço a consultar
+    output logic [N_PORTS:0]                        lookup_hit_o,   // rota existe(1)
+    output logic [N_PORTS:0][$clog2(N_PORTS+1)-1:0] lookup_port_o   // output/0 se não houver rota
 );
  
     localparam int PW = $clog2(N_PORTS + 1); // bits para n de porta 
@@ -21,8 +21,6 @@ module sw_route_table #(
     // Faixa dos endereços lógicos
     localparam logic [7:0]    ADDR_MIN = 8'd32;
     localparam logic [7:0]    ADDR_MAX = 8'd254;
-    localparam logic [PW-1:0] PORT_MIN = PW'(1);
-    localparam logic [PW-1:0] PORT_MAX = PW'(N_PORTS);
 
     // Memória
     logic [PW-1:0] port_mem  [32:254];
@@ -42,7 +40,7 @@ module sw_route_table #(
     end
 
     // lookup
-    for (genvar i = 1; i <= N_PORTS; i++) begin : g_lookup
+    for (genvar i = 0; i <= N_PORTS; i++) begin : g_lookup
         logic [7:0]    addr;      // Consultar endereço
         logic          in_range;  // é endereço lógico (32--254) = 1
         logic [7:0]    idx;       // índice seguro para ler a memória
@@ -57,7 +55,7 @@ module sw_route_table #(
         assign idx      = in_range ? addr : ADDR_MIN;
 
         assign port     = port_mem[idx];
-        assign port_ok  = (port >= PORT_MIN) && (port <= PORT_MAX);
+        assign port_ok  = (int'(port) >= 1) && (int'(port) <= N_PORTS);  // em int: sem CMPCONST
 
         // Hit = endereço lógico + rota válida + porta existente.
         // Sem rota se Porta gravada 0 ou > N conta como

@@ -4,34 +4,34 @@ module sw_out_arb #(
     input  logic clk,
     input  logic rst_n,                          // reset (0)
 
-    input  logic [N_PORTS:1]               req_i,       // bit i = entrada i pede essa saída
+    input  logic [N_PORTS:0]               req_i,       // bit i = entrada i pede essa saída
     input  logic                           wr_en_i,     // saída gravou palavra neste ciclo = 1
     input  logic                           wr_marker_i, // palavra gravada é EOP/EEP = 1
 
-    output logic [N_PORTS:1]               gnt_o,       // one-hot: entrada dona
+    output logic [N_PORTS:0]               gnt_o,       // one-hot: entrada dona
     output logic                           busy_o,
-    output logic [$clog2(N_PORTS+1)-1:0]   owner_o      // entrada dona (1--N)/ 0 = livre
+    output logic [$clog2(N_PORTS+1)-1:0]   owner_o      // entrada dona (0--N)/ só vale com busy_o
 );
 
     localparam int PW = $clog2(N_PORTS + 1); // bits para n de porta
 
     // regs
     logic          busy_q;
-    logic [PW-1:0] owner_q;  // dono (1--N)/ 0 = livre
-    logic [PW-1:0] last_q;   // último atendido (1--N)
+    logic [PW-1:0] owner_q;  // dono (0--N)/ só vale com busy_q
+    logic [PW-1:0] last_q;   // último atendido (0--N)
 
     // round-robin
     logic [PW-1:0] winner;   // primeiro pedido depois de last_q
     logic          found;
-    logic [PW-1:0] idx_p;    // porta olhada (1--N)
+    logic [PW-1:0] idx_p;    // porta olhada (0--N)
 
     always_comb begin
         winner = '0;
         found  = 1'b0;
         idx_p  = '0;
-        for (int k = 1; k <= N_PORTS; k++) begin
-            // dá a volta (1..N); unsigned' evita 4 virar -4
-            idx_p = PW'(unsigned'(((int'(last_q) - 1 + k) % N_PORTS) + 1));
+        for (int k = 1; k <= N_PORTS + 1; k++) begin
+            // dá a volta (0..N), N+1 entradas
+            idx_p = PW'(unsigned'((int'(last_q) + k) % (N_PORTS + 1)));
             if (!found && req_i[idx_p]) begin
                 winner = idx_p;
                 found  = 1'b1;
@@ -41,7 +41,7 @@ module sw_out_arb #(
 
     // concessão
     always_comb begin
-        for (int i = 1; i <= N_PORTS; i++) begin
+        for (int i = 0; i <= N_PORTS; i++) begin
             gnt_o[i] = busy_q && (owner_q == PW'(unsigned'(i)));
         end
     end
@@ -57,7 +57,7 @@ module sw_out_arb #(
         if (!rst_n) begin
             busy_q  <= 1'b0;
             owner_q <= '0;
-            last_q  <= PW'(N_PORTS);   // 1a busca começa na porta 1
+            last_q  <= PW'(N_PORTS);   // 1a busca começa na porta 0
         end else if (busy_q) begin
             if (release_w) begin
                 busy_q  <= 1'b0;

@@ -1,6 +1,6 @@
 module sw_in_ctrl #(
     parameter int N_PORTS = 4,                   // portas físicas (2--31)
-    parameter int MY_PORT = 1                    // esta entrada (1--N)
+    parameter int MY_PORT = 1                    // esta entrada (0--N)
 )(
     input  logic clk,
     input  logic rst_n,                          // reset (0)
@@ -14,15 +14,15 @@ module sw_in_ctrl #(
     input  logic                           lookup_hit_i,  // rota existe = 1
     input  logic [$clog2(N_PORTS+1)-1:0]   lookup_port_i, // porta da rota (1--N)
 
-    input  logic [N_PORTS:1]               link_run_i,  // link em Run = 1
-    input  logic [N_PORTS:1]               out_full_i,  // tx_fifo cheia = 1
+    input  logic [N_PORTS:0]               link_run_i,  // link em Run = 1
+    input  logic [N_PORTS:0]               out_full_i,  // tx_fifo cheia = 1
 
     // árbitro
-    output logic [N_PORTS:1]               req_o,       // one-hot: saída pedida
+    output logic [N_PORTS:0]               req_o,       // one-hot: saída pedida
     input  logic                           gnt_i,       // concedido = 1
 
     // crossbar
-    output logic [$clog2(N_PORTS+1)-1:0]   dest_o,      // destino (1--N)
+    output logic [$clog2(N_PORTS+1)-1:0]   dest_o,      // destino (0--N)
     output logic                           wvalid_o,    // grava palavra = 1
     output logic [8:0]                     wdata_o,     // palavra a gravar
     output logic                           err_o        // descartei pacote = 1 (1 ciclo)
@@ -34,7 +34,7 @@ module sw_in_ctrl #(
 
     // regs
     state_t        state;
-    logic [PW-1:0] dest_q;     // destino (1--N)
+    logic [PW-1:0] dest_q;     // destino (0--N)
     logic          del_hdr_q;  // apagar cabeçalho = 1
     logic          err_q;      // pulso de descarte
     logic          eep_to_idle_q; // depois do ST_EEP: ST_IDLE = 1/ ST_SPILL = 0
@@ -42,29 +42,31 @@ module sw_in_ctrl #(
     // cabeçalho
     logic [7:0]       addr;      // frente da fifo
     logic             is_mark;   // EOP/EEP = 1
-    logic             is_path;   // caminho (1--N) = 1
+    logic             is_path;   // caminho (0--N) = 1
     logic             is_log;    // lógico (32--254) com rota = 1
-    logic [PW-1:0]    cand;      // destino candidato/ 0 = inválido
-    logic [N_PORTS:1] cand_sel;  // one-hot do candidato
+    logic             cand_ok;   // cabeçalho válido = 1 (0 agora é a porta 0)
+    logic [PW-1:0]    cand;      // destino candidato (só vale com cand_ok)
+    logic [N_PORTS:0] cand_sel;  // one-hot do candidato
     logic             hdr_ok;    // destino válido e em Run = 1
 
     assign addr    = in_data_i[7:0];
     assign is_mark = in_data_i[8];
-    assign is_path = (addr >= 8'd1) && (addr <= 8'(N_PORTS));
+    assign is_path = (addr <= 8'(N_PORTS));
     assign is_log  = (addr >= 8'd32) && (addr <= 8'd254) && lookup_hit_i;
+    assign cand_ok = is_path || is_log;
     assign cand    = is_path ? PW'(addr) : (is_log ? lookup_port_i : '0);
 
     // destino
-    logic [N_PORTS:1] dest_sel;   // one-hot de dest_q
+    logic [N_PORTS:0] dest_sel;   // one-hot de dest_q
     logic             dest_full;  // saída de destino cheia = 1
     logic             dest_up;    // link de destino em Run = 1
     logic             my_link_up; // link desta entrada em Run = 1
     logic             xfer;       // copia palavra neste ciclo = 1
 
-    // one-hot por comparação: candidato 0 ou > N vira zero (índice seguro)
+    // one-hot por comparação: cabeçalho inválido ou > N vira zero (índice seguro)
     always_comb begin
-        for (int i = 1; i <= N_PORTS; i++) begin
-            cand_sel[i] = (cand   == PW'(unsigned'(i)));
+        for (int i = 0; i <= N_PORTS; i++) begin
+            cand_sel[i] = cand_ok && (cand == PW'(unsigned'(i)));
             dest_sel[i] = (dest_q == PW'(unsigned'(i)));
         end
     end

@@ -16,6 +16,15 @@ module spw_switch #(
 
     input  logic [N_PORTS:1]                 link_run_i,   // link em Run = 1
 
+    // porta 0 (configuração / RMAP)
+    input  logic [8:0]                       cfg_in_data_i,    // Resposta RMAP
+    input  logic                             cfg_in_empty_i,
+    output logic                             cfg_in_rd_en_o,
+    output logic [8:0]                       cfg_out_data_o,   // pacote pro RMAP (s/ byte 0)
+    input  logic                             cfg_out_full_i,
+    output logic                             cfg_out_wr_en_o,
+    input  logic                             cfg_ready_i,      // RMAP pronto
+
     // time-code
     input  logic                             tc_en_i,      // repasse ligado = 1
     input  logic [N_PORTS:1]                 tc_got_i,     // chegou time-code = 1 (pulso)
@@ -31,29 +40,47 @@ module spw_switch #(
     input  logic                             tbl_valid_i,  // 1 = rota válida/ 0 = apaga
 
     // status
-    output logic [N_PORTS:1]                 err_route_o,  // entrada descartou pacote = 1 (pulso)
-    output logic [N_PORTS:1]                 out_busy_o    // saída com dono = 1
+    output logic [N_PORTS:0]                 err_route_o,  // entrada descartou pacote = 1 (pulso)
+    output logic [N_PORTS:0]                 out_busy_o    // saída com dono = 1
 );
 
     localparam int PW = $clog2(N_PORTS + 1); // bits para n de porta
 
+    // porta 0 no índice 0
+    logic [N_PORTS:0][8:0]      all_in_data;
+    logic [N_PORTS:0]           all_in_empty;
+    logic [N_PORTS:0]           all_in_rd_en;
+    logic [N_PORTS:0][8:0]      all_out_data;
+    logic [N_PORTS:0]           all_out_full;
+    logic [N_PORTS:0]           all_out_wr_en;
+    logic [N_PORTS:0]           link_run;    // cfg_ready_i no 0
+
+    // Separado por que a porta zero não vai ligada no codec
+    assign all_in_data  = {in_data_i, cfg_in_data_i};
+    assign all_in_empty = {in_empty_i, cfg_in_empty_i};
+    assign all_out_full = {out_full_i, cfg_out_full_i};
+    assign link_run     = {link_run_i, cfg_ready_i};
+    assign {in_rd_en_o, cfg_in_rd_en_o}   = all_in_rd_en;
+    assign {out_data_o, cfg_out_data_o}   = all_out_data;
+    assign {out_wr_en_o, cfg_out_wr_en_o} = all_out_wr_en;
+
     // tabela
-    logic [N_PORTS:1][7:0]      look_addr;   // endereço consultado por entrada
-    logic [N_PORTS:1]           look_hit;
-    logic [N_PORTS:1][PW-1:0]   look_port;
+    logic [N_PORTS:0][7:0]      look_addr;   // endereço consultado por entrada
+    logic [N_PORTS:0]           look_hit;
+    logic [N_PORTS:0][PW-1:0]   look_port;
 
     // entradas para crossbar
-    logic [N_PORTS:1]           ic_wvalid;
-    logic [N_PORTS:1][8:0]      ic_wdata;
-    logic [N_PORTS:1][PW-1:0]   ic_dest;
-    logic [N_PORTS:1][N_PORTS:1] ic_req;     // linha i = req_o da entrada i
-    logic [N_PORTS:1]           ic_gnt;      // gnt da entrada i
+    logic [N_PORTS:0]           ic_wvalid;
+    logic [N_PORTS:0][8:0]      ic_wdata;
+    logic [N_PORTS:0][PW-1:0]   ic_dest;
+    logic [N_PORTS:0][N_PORTS:0] ic_req;     // linha i = req_o da entrada i
+    logic [N_PORTS:0]           ic_gnt;      // gnt da entrada i
 
     // crossbar e árbitros
-    logic [N_PORTS:1][N_PORTS:1] arb_req;    // linha j = pedidos para a saída j
-    logic [N_PORTS:1][N_PORTS:1] arb_gnt;    // linha j = gnt_o do árbitro j
+    logic [N_PORTS:0][N_PORTS:0] arb_req;    // linha j = pedidos para a saída j
+    logic [N_PORTS:0][N_PORTS:0] arb_gnt;    // linha j = gnt_o do árbitro j
     // verilator lint_off UNUSEDSIGNAL
-    logic [N_PORTS:1][PW-1:0]   arb_owner;   // dono de cada saída (debug)
+    logic [N_PORTS:0][PW-1:0]   arb_owner;   // dono de cada saída (debug)
     // verilator lint_on UNUSEDSIGNAL
 
     sw_route_table #(.N_PORTS(N_PORTS)) u_tbl (
@@ -63,15 +90,15 @@ module spw_switch #(
         .lookup_addr_i(look_addr), .lookup_hit_o(look_hit), .lookup_port_o(look_port)
     );
 
-    for (genvar i = 1; i <= N_PORTS; i++) begin : g_port
-        assign look_addr[i] = in_data_i[i][7:0];
+    for (genvar i = 0; i <= N_PORTS; i++) begin : g_port
+        assign look_addr[i] = all_in_data[i][7:0];
 
         // entrada i
         sw_in_ctrl #(.N_PORTS(N_PORTS), .MY_PORT(i)) u_in (
             .clk(clk), .rst_n(rst_n),
-            .in_data_i(in_data_i[i]), .in_empty_i(in_empty_i[i]), .in_rd_en_o(in_rd_en_o[i]),
+            .in_data_i(all_in_data[i]), .in_empty_i(all_in_empty[i]), .in_rd_en_o(all_in_rd_en[i]),
             .lookup_hit_i(look_hit[i]), .lookup_port_i(look_port[i]),
-            .link_run_i(link_run_i), .out_full_i(out_full_i),
+            .link_run_i(link_run), .out_full_i(all_out_full),
             .req_o(ic_req[i]), .gnt_i(ic_gnt[i]),
             .dest_o(ic_dest[i]), .wvalid_o(ic_wvalid[i]), .wdata_o(ic_wdata[i]),
             .err_o(err_route_o[i])
@@ -81,7 +108,7 @@ module spw_switch #(
         sw_out_arb #(.N_PORTS(N_PORTS)) u_arb (
             .clk(clk), .rst_n(rst_n),
             .req_i(arb_req[i]),
-            .wr_en_i(out_wr_en_o[i]), .wr_marker_i(out_data_o[i][8]),  // EOP/EEP solta a saída
+            .wr_en_i(all_out_wr_en[i]), .wr_marker_i(all_out_data[i][8]),  // EOP/EEP solta a saída
             .gnt_o(arb_gnt[i]), .busy_o(out_busy_o[i]), .owner_o(arb_owner[i])
         );
     end
@@ -89,7 +116,7 @@ module spw_switch #(
     sw_crossbar #(.N_PORTS(N_PORTS)) u_xbar (
         .wvalid_i(ic_wvalid), .wdata_i(ic_wdata), .dest_i(ic_dest), .req_i(ic_req),
         .gnt_i(arb_gnt),
-        .out_wr_en_o(out_wr_en_o), .out_data_o(out_data_o),
+        .out_wr_en_o(all_out_wr_en), .out_data_o(all_out_data),
         .req_col_o(arb_req), .gnt_in_o(ic_gnt)
     );
 
