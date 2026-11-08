@@ -1,211 +1,161 @@
-module state_machine #(
-    parameter int CLK_FREQ = 10_000_000
-)(
-    input logic clk,
-    input logic rst_n,
+import spw_pkg::*;
+
+module state_machine (
+    input i_sys_clk, // system clock
+    input i_sys_rstn, // synchronized reset
+
+    input i_link_start,
+    input i_auto_start,
+    input i_link_disable,
+    input i_rx_space_ok, // don't start without room for the first FCT
 
     // RX
-    output logic en_rx,
-    output logic rst_n_rx,
-    input logic got_bit,
-    input logic got_FCT,
-    input logic got_null,
-    input logic got_TimeCode,
-    input logic got_N_Char,
-    input logic rx_Error,
+    input i_rx_got_null,
+    input i_rx_got_fct,
+    input i_rx_got_nchar,
+    input i_rx_got_timecode,
+    input i_rx_parity_err,
+    input i_rx_esc_err,
+    input i_rx_overflow_err,
+    input i_disconnect,
+    input i_rx_credit_err,
 
     // TX
-    output logic en_tx,
-    output logic rst_n_tx,
-    output logic send_FCT,
-    output logic send_Null,
+    input i_tx_credit_err,
 
-    // FSM
-    input logic disconnect,
-    input logic start_link,
-    output logic run_state
+    // outputs, all registered from `next_state`
+    output reg o_tx_enable, // High in {Started, Connecting, Run}
+    output reg o_rx_enable, // High in {ErrorWait, Ready, Started, Connecting, Run}
+    output reg o_fct_allowed, // High in {Connecting, Run}
+    output reg o_link_run, // High in {Run}
+    output reg o_link_error, // one cycle pulse after a fault in Run
+    output e_link_state o_state
+
 );
+    localparam TIMER_W = $clog2(T_12U8_CYCLES + 1);
 
-    // TODO: por hora vou deixar assim
-    logic auto_start;
-    assign auto_start = 1'b1;
+    wire rx_error = i_rx_parity_err | i_rx_esc_err | i_rx_overflow_err | i_disconnect;
+    wire credit_error = i_tx_credit_err | i_rx_credit_err;
+    wire link_enabled = (!i_link_disable) && (i_link_start || (i_auto_start && i_rx_got_null));
+
+    e_link_state state, next_state;
+    assign o_state = state;
+
 
     //temporizador
     logic timer_en;
     logic timer_clear;
-    // 12.8us a 50 MHz são 640 ciclos
-    logic [15:0] timer_us_cnt;
+    logic [TIMER_W-1:0] timer;
     
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            timer_us_cnt <= 16'd0;
-        end else begin
-            if (timer_clear) begin
-                timer_us_cnt <= 16'd0;
-            end else if (timer_en) begin
-                timer_us_cnt <= timer_us_cnt + 1'b1;
-            end
-        end
+    always_ff @(posedge i_sys_clk or negedge i_sys_rstn) begin
+        if (!i_sys_rstn) timer <= '0;
+        else if (timer_clear) timer <= '0;
+        else if (timer_en) timer <= timer + 1'b1;
     end
 
-    // CLK_FREQ é a frequência de clk; longint porque CLK_FREQ * 128 não cabe em int
-    localparam int unsigned T_6_4US_CYCLES  = int'((longint'(CLK_FREQ) * 64) / 10_000_000);
-    localparam int unsigned T_12_8US_CYCLES = int'((longint'(CLK_FREQ) * 128) / 10_000_000);
-
-    logic timeout_6_4us;
-    logic timeout_12_8us;
-    assign timeout_6_4us  = (timer_us_cnt >= T_6_4US_CYCLES);
-    assign timeout_12_8us = (timer_us_cnt >= T_12_8US_CYCLES);
+    wire timeout_6u4  = timer >= T_6U4_CYCLES;
+    wire timeout_12u8 = timer >= T_12U8_CYCLES;
 
 
-    typedef enum logic [2:0] {
-        ERRO_RESET = 3'b000,
-        ERRO_WAIT = 3'b001,
-        READY = 3'b010,
-        STARTED = 3'b011,
-        CONNECTING = 3'b100,
-        RUN = 3'b101
-    } state_t;
-
-    state_t current_state, next_state;
-
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            current_state <= ERRO_RESET;
+    logic next_tx_enable, next_rx_enable, next_fct_allowed, next_link_run, next_link_error;
+    always_ff @(posedge i_sys_clk or negedge i_sys_rstn) begin
+        if (!i_sys_rstn) begin
+            state <= LINK_ST_ERROR_RESET;
+            // outputs
+            o_tx_enable <= 0;
+            o_rx_enable <= 0;
+            o_fct_allowed <= 0;
+            o_link_run <= 0;
+            o_link_error <= 0;
         end else begin
-            current_state <= next_state;
+            state <= next_state;
+            o_tx_enable <= next_tx_enable;
+            o_rx_enable <= next_rx_enable;
+            o_fct_allowed <= next_fct_allowed;
+            o_link_run <= next_link_run;
+            o_link_error <= next_link_error;
         end
     end
 
     always_comb begin
-        next_state = current_state;
+        next_state = state;
         timer_en = 1'b0;
         timer_clear = 1'b0;
+        // this is the only output here because we want it to be
+        // a pulse when going from Run to ErrorReset
+        next_link_error = 0;
 
-        case (current_state)
-            ERRO_RESET: begin
+        case (state)
+            LINK_ST_ERROR_RESET: begin
                 timer_en = 1'b1; 
-                if (timeout_6_4us) begin
-                    next_state = ERRO_WAIT;
+                if (timeout_6u4) begin
+                    next_state = LINK_ST_ERROR_WAIT;
                     timer_clear = 1'b1;
                 end
             end
-
-            ERRO_WAIT: begin
+            LINK_ST_ERROR_WAIT: begin
                 timer_en = 1'b1;
-                if (rx_Error | got_FCT | got_N_Char | got_TimeCode) begin
-                    next_state = ERRO_RESET;
+                if (rx_error | i_rx_got_fct | i_rx_got_nchar | i_rx_got_timecode) begin
+                    next_state = LINK_ST_ERROR_RESET;
                     timer_clear = 1'b1;
-                end else if (timeout_12_8us) begin
-                    next_state = READY;
+                end else if (timeout_12u8) begin
+                    next_state = LINK_ST_READY;
                     timer_clear = 1'b1;
                 end 
             end
 
-            READY: begin
-                if (rx_Error | got_FCT | got_N_Char | got_TimeCode) begin
-                    next_state = ERRO_RESET;
+            LINK_ST_READY: begin
+                if (rx_error | i_rx_got_fct | i_rx_got_nchar | i_rx_got_timecode) begin
+                    next_state = LINK_ST_ERROR_RESET;
                     timer_clear = 1'b1;
-                end else if (!disconnect && (start_link || (auto_start && got_bit))) begin
-                    next_state = STARTED;
+                // we want to initiate communication only if it's possible to send FCTs
+                // (if we have enough space in the receive buffer)
+                end else if (link_enabled && i_rx_space_ok) begin
+                    next_state = LINK_ST_STARTED;
                     timer_clear = 1'b1;
                 end
             end
 
-            STARTED: begin
+            LINK_ST_STARTED: begin
                 timer_en = 1'b1;
-                if (timeout_12_8us | rx_Error | got_FCT | got_N_Char | got_TimeCode) begin
-                    next_state = ERRO_RESET;
+                if (timeout_12u8 | rx_error | i_rx_got_fct | i_rx_got_nchar | i_rx_got_timecode) begin
+                    next_state = LINK_ST_ERROR_RESET;
                     timer_clear = 1'b1;
-                end else if (got_null) begin
-                    next_state = CONNECTING;
+                end else if (i_rx_got_null) begin
+                    next_state = LINK_ST_CONNECTING;
                     timer_clear = 1'b1;
                 end
             end
 
-            CONNECTING: begin
+            LINK_ST_CONNECTING: begin
                 timer_en = 1'b1;
-                if (timeout_12_8us | rx_Error | got_N_Char | got_TimeCode) begin
-                    next_state = ERRO_RESET;
+                if (timeout_12u8 | rx_error | i_rx_got_nchar | i_rx_got_timecode) begin
+                    next_state = LINK_ST_ERROR_RESET;
                     timer_clear = 1'b1;
-                end else if (got_FCT) begin
-                    next_state = RUN;
+                end else if (i_rx_got_fct) begin
+                    next_state = LINK_ST_RUN;
                     timer_clear = 1'b1;
                 end
             end
 
-            RUN: begin
-                //no 4link, usa diferente, usa isso:
-                // if ((! (!disconnect && (start_link || (auto_start and got_bit))) )|| rx_Error) begin
-                if (disconnect || rx_Error) begin
-                    next_state = ERRO_RESET;
+            LINK_ST_RUN: begin
+                if (rx_error | credit_error | i_link_disable) begin
+                    next_state = LINK_ST_ERROR_RESET;
+                    next_link_error = rx_error | credit_error;
                     timer_clear = 1'b1;
                 end
             end
 
             default: begin
-                next_state = ERRO_RESET;
+                next_state = LINK_ST_ERROR_RESET;
             end
         endcase
     end
 
-    // saídas
-        always_comb begin
-        en_rx = 1'b0;
-        rst_n_rx = 1'b1;
-        en_tx = 1'b0;
-        rst_n_tx = 1'b1;
-        send_FCT = 1'b0;
-        send_Null = 1'b0;
-        run_state = 1'b0;
-
-        case (current_state)
-            ERRO_RESET: begin
-                rst_n_tx = 1'b0;
-                rst_n_rx = 1'b0;
-            end
-
-            ERRO_WAIT: begin
-                rst_n_tx = 1'b0;
-                en_rx = 1'b1;
-            end
-
-            READY: begin
-                rst_n_tx = 1'b0;
-                en_rx = 1'b1;
-            end
-
-            STARTED: begin
-                en_tx = 1'b1;
-                send_Null = 1'b1;
-                en_rx = 1'b1;
-            end
-
-            CONNECTING: begin
-                en_tx = 1'b1;
-                send_FCT = 1'b1;
-                send_Null = 1'b1;
-                en_rx = 1'b1;
-            end
-
-            RUN: begin
-                en_tx = 1'b1;
-                send_FCT = 1'b0;
-                send_Null = 1'b1;
-                en_rx = 1'b1;
-                run_state = 1'b1;
-            end
-
-            default: begin
-                en_rx = 1'b0;
-                rst_n_rx = 1'b1;
-                en_tx = 1'b0;
-                rst_n_tx = 1'b1;
-                send_FCT = 1'b0;
-                send_Null = 1'b0;
-                run_state = 1'b0;
-            end
-        endcase
-    end
+    // next outputs
+    assign next_tx_enable = next_state inside {LINK_ST_STARTED, LINK_ST_CONNECTING, LINK_ST_RUN};
+    assign next_rx_enable = next_state != LINK_ST_ERROR_RESET;
+    assign next_fct_allowed = next_state inside {LINK_ST_CONNECTING, LINK_ST_RUN};
+    assign next_link_run = next_state == LINK_ST_RUN;
 
 endmodule
