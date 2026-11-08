@@ -1,5 +1,6 @@
 
-// 2FF reset synchronizer. It must have one instance per
+// 2FF reset synchronizer. Asynchronous assert, synchronous release.
+// It must have one instance per
 // clock domain, excluding the RX clock.
 module reset_sync (
     input logic i_clk,

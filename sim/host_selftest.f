@@ -1,4 +1,4 @@
-../rtl/rx_fifo.sv
+../rtl/common/fifo.sv
 link/host/host_if.sv
 link/host/host_item.sv
 link/host/host_driver.sv

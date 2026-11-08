@@ -2,8 +2,8 @@ package host_item_pkg;
   import uvm_pkg::*;
   `include "uvm_macros.svh"
 
-  // control words of the codec FIFOs
-  parameter bit [8:0] HOST_WORD_EOP = 9'b1_0000_0010;
+  // control words of the codec buffers (spw_pkg::CONST_EOP / CONST_EEP)
+  parameter bit [8:0] HOST_WORD_EOP = 9'b1_0000_0000;
   parameter bit [8:0] HOST_WORD_EEP = 9'b1_0000_0001;
 
   typedef enum {
@@ -13,7 +13,8 @@ package host_item_pkg;
   } host_end_e;
 
   typedef enum {
-    HOST_CFG_TX_DIV
+    HOST_CFG_RUN_DIV, // i_run_div
+    HOST_CFG_LINK     // i_link_start, i_auto_start, i_link_disable
   } host_config_kind_e;
 
   /// Common base of everything the host sequencer carries
@@ -26,11 +27,17 @@ package host_item_pkg;
 
   class host_config_item extends host_base_item;
     host_config_kind_e typ;
-    bit [7:0] tx_div; // value of div_counter_tx
+    bit [6:0] run_div;  // HOST_CFG_RUN_DIV: run rate = 200 MHz / (run_div + 1)
+    bit link_start;     // HOST_CFG_LINK
+    bit auto_start;
+    bit link_disable;
 
     `uvm_object_utils_begin(host_config_item)
       `uvm_field_enum(host_config_kind_e, typ, UVM_ALL_ON)
-      `uvm_field_int(tx_div, UVM_ALL_ON)
+      `uvm_field_int(run_div, UVM_ALL_ON)
+      `uvm_field_int(link_start, UVM_ALL_ON)
+      `uvm_field_int(auto_start, UVM_ALL_ON)
+      `uvm_field_int(link_disable, UVM_ALL_ON)
     `uvm_object_utils_end
 
     function new(string name = "host_config_item");
@@ -38,7 +45,10 @@ package host_item_pkg;
     endfunction
 
     virtual function string convert2string();
-      return $sformatf("HOST_CFG type=%s tx_div=%0d", typ.name(), tx_div);
+      if (typ == HOST_CFG_RUN_DIV)
+        return $sformatf("HOST_CFG type=%s run_div=%0d", typ.name(), run_div);
+      return $sformatf("HOST_CFG type=%s link_start=%0b auto_start=%0b link_disable=%0b",
+                       typ.name(), link_start, auto_start, link_disable);
     endfunction
   endclass
 

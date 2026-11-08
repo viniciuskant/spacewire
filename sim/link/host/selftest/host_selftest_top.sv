@@ -15,32 +15,37 @@ module host_selftest_top;
 
   spw_host_if hif (.clk_system(clk_system), .rst_n(rst_n));
 
-  // TX FIFO -> RX FIFO loopback, small enough to fill up
-  localparam int DEPTH = 8;
-  logic [$clog2(DEPTH+1)-1:0] free_space;
+  // TX buffer -> RX buffer loopback, small enough to fill up
+  localparam int AW = 3; // 8 entries
+  logic loop_empty;
 
-  rx_fifo #(.DEPTH(DEPTH), .DATA_WIDTH(9)) u_loop_fifo (
-    .wr_clk_i(clk_system),
-    .rd_clk_i(clk_system),
-    .rst_n(rst_n),
-    .wr_en_i(hif.SpW_Packet_TX_en),
-    .wr_data_i(hif.SpW_Packet_TX),
-    .rd_en_i(hif.SpW_Packet_RX_en),
-    .rd_data_o(hif.SpW_Packet_RX),
-    .empty_o(hif.empty_rx_fifo),
-    .free_space_o(free_space)
+  fifo #(.ASIZE(AW), .DSIZE(9)) u_loop_fifo (
+    .i_clk(clk_system),
+    .i_rstn(rst_n),
+    .i_wr(hif.i_tx_wr),
+    .i_rd(hif.i_rx_rd),
+    .i_wdata(hif.i_tx_wdata),
+    .o_rdata(hif.o_rx_rdata),
+    .o_empty(loop_empty),
+    .o_full(hif.o_tx_full),
+    .o_count()
   );
-  assign hif.full_tx_fifo = (free_space == '0);
+  assign hif.o_rx_valid = !loop_empty;
 
   always_ff @(posedge clk_system or negedge rst_n) begin
     if (!rst_n) begin
-      hif.Time_Code_RX <= '0;
-      hif.Time_Code_RX_valid <= 0;
+      hif.o_timecode <= '0;
+      hif.o_tick <= 0;
     end else begin
-      hif.Time_Code_RX <= hif.Time_Code_TX;
-      hif.Time_Code_RX_valid <= hif.Time_Code_TX_valid;
+      hif.o_timecode <= hif.i_timecode;
+      hif.o_tick <= hif.i_tick;
     end
   end
+
+  // no link here: status stays quiet
+  assign hif.o_link_state = '0;
+  assign hif.o_link_run = 0;
+  assign hif.o_link_error = 0;
 
   initial begin
     uvm_config_db #(virtual spw_host_if)::set(null, "uvm_test_top", "vif", hif);

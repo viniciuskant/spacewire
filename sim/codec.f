@@ -1,26 +1,4 @@
-../rtl/cdc_sync.sv
-../rtl/var_clk_divider.sv
-../rtl/fifo_rx2fifo/rtl/fifo1.sv
-../rtl/fifo_rx2fifo/rtl/fifomem.sv
-../rtl/fifo_rx2fifo/rtl/rptr_empty.sv
-../rtl/fifo_rx2fifo/rtl/sync_r2w.sv
-../rtl/fifo_rx2fifo/rtl/sync_w2r.sv
-../rtl/fifo_rx2fifo/rtl/wptr_full.sv
-../rtl/rx_fifo.sv
-../rtl/tx_fifo.sv
-../rtl/error_cleanup_fsm.sv
-../rtl/flow_control_rx.sv
-../rtl/flow_control_tx.sv
-../rtl/flow_control.sv
-../rtl/state_machine.sv
-../rtl/rx_signal.sv
-../rtl/rx_char.sv
-../rtl/rx.sv
-../rtl/spw_char_decode.sv
-../rtl/tx_signal.sv
-../rtl/tx_char.sv
-../rtl/tx.sv
-../rtl/codec.sv
+-F ../rtl/filelist.f
 link/spw_defines.sv
 link/spw_codec_utils.sv
 link/serial/ds_if.sv

@@ -3,11 +3,14 @@ package host_monitor_pkg;
   import host_item_pkg::*;
   `include "uvm_macros.svh"
 
-  /// Rebuilds packets from the words that cross the host FIFOs:
-  ///   TX: written while SpW_Packet_TX_en && !full_tx_fifo
-  ///   RX: read while SpW_Packet_RX_en && !empty_rx_fifo
+  /// Rebuilds packets from the words that cross the host buffers:
+  ///   TX: written while i_tx_wr && !o_tx_full
+  ///   RX: read while i_rx_rd && o_rx_valid
   /// A packet is published when its EOP/EEP goes through. Partial packets are
   /// dropped on reset.
+  ///
+  /// It also follows the status outputs: link_state is the DUT's state
+  /// (spw_pkg::e_link_state), and link_errors counts o_link_error pulses.
   class host_monitor extends uvm_monitor;
     `uvm_component_utils(host_monitor)
 
@@ -19,6 +22,9 @@ package host_monitor_pkg;
     uvm_analysis_port #(host_packet_item) rx_pkt_ap;
     uvm_analysis_port #(host_timecode_item) tx_tc_ap;
     uvm_analysis_port #(host_timecode_item) rx_tc_ap;
+
+    bit [2:0] link_state;
+    int unsigned link_errors;
 
     protected bit [7:0] tx_data[$];
     protected bit [7:0] rx_data[$];
@@ -48,17 +54,27 @@ package host_monitor_pkg;
           continue;
         end
 
-        if (vif.mon_cb.SpW_Packet_TX_en === 1 && vif.mon_cb.full_tx_fifo === 0)
-          collect_word(0, vif.mon_cb.SpW_Packet_TX);
+        if (vif.mon_cb.i_tx_wr === 1 && vif.mon_cb.o_tx_full === 0)
+          collect_word(0, vif.mon_cb.i_tx_wdata);
 
-        if (vif.mon_cb.SpW_Packet_RX_en === 1 && vif.mon_cb.empty_rx_fifo === 0)
-          collect_word(1, vif.mon_cb.SpW_Packet_RX);
+        if (vif.mon_cb.i_rx_rd === 1 && vif.mon_cb.o_rx_valid === 1)
+          collect_word(1, vif.mon_cb.o_rx_rdata);
 
-        if (vif.mon_cb.Time_Code_TX_valid === 1)
-          tx_tc_ap.write(new_timecode(vif.mon_cb.Time_Code_TX));
+        if (vif.mon_cb.i_tick === 1)
+          tx_tc_ap.write(new_timecode(vif.mon_cb.i_timecode));
 
-        if (vif.mon_cb.Time_Code_RX_valid === 1)
-          rx_tc_ap.write(new_timecode(vif.mon_cb.Time_Code_RX));
+        if (vif.mon_cb.o_tick === 1)
+          rx_tc_ap.write(new_timecode(vif.mon_cb.o_timecode));
+
+        if (!$isunknown(vif.mon_cb.o_link_state) && vif.mon_cb.o_link_state != link_state) begin
+          `uvm_info(get_type_name(), $sformatf("DUT link state %0d -> %0d", link_state, vif.mon_cb.o_link_state), UVM_HIGH)
+          link_state = vif.mon_cb.o_link_state;
+        end
+
+        if (vif.mon_cb.o_link_error === 1) begin
+          link_errors++;
+          `uvm_info(get_type_name(), "DUT reported a link error", UVM_LOW)
+        end
       end
     endtask
 
@@ -76,7 +92,7 @@ package host_monitor_pkg;
         HOST_WORD_EOP: pkt.end_marker = HOST_END_EOP;
         HOST_WORD_EEP: pkt.end_marker = HOST_END_EEP;
         default: begin
-          `uvm_error(get_type_name(), $sformatf("invalid control word 0x%03h on the %s FIFO",
+          `uvm_error(get_type_name(), $sformatf("invalid control word 0x%03h on the %s buffer",
                                                 w, rx ? "RX" : "TX"))
           return;
         end

@@ -39,16 +39,23 @@ package host_seq_lib_pkg;
     endtask
   endclass
 
-  /// Sends num random timecodes, with up to max_gap_ns between them
+  /// Sends num random timecodes, min_gap_ns to max_gap_ns apart.
+  ///
+  /// The codec holds one timecode and drops a tick that comes while it is
+  /// still sending the previous one (tx_timecode_slot), so the default gap
+  /// leaves room for one: a timecode is 14 bits, 1.4 us at 10 Mbit/s.
   class host_timecode_seq extends uvm_sequence #(host_base_item);
     `uvm_object_utils(host_timecode_seq)
 
     rand int num;
+    rand int unsigned min_gap_ns;
     rand int unsigned max_gap_ns;
 
     constraint c_num {
       soft num inside {[5:20]};
-      soft max_gap_ns == 2000;
+      soft min_gap_ns == 3000;
+      soft max_gap_ns == 5000;
+      min_gap_ns <= max_gap_ns;
     }
 
     function new(string name = "host_timecode_seq");
@@ -58,7 +65,7 @@ package host_seq_lib_pkg;
     virtual task body();
       for (int i = 0; i < num; ++i) begin
         host_timecode_item tc = host_timecode_item::type_id::create("tc");
-        #($urandom_range(max_gap_ns) * 1ns);
+        #($urandom_range(max_gap_ns, min_gap_ns) * 1ns);
         start_item(tc);
         if (!tc.randomize()) begin
           `uvm_fatal(get_type_name(), "failed to randomize timecode")
