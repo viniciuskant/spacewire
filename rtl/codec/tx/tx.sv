@@ -11,10 +11,8 @@ module tx(
     input [6:0] i_clk_div,
 
     // From the FSM
-    // This is the "enable TX" signal from the FSM. It remains
-    // high in all FSM states except "ErrorReset" and "ErrorWait"
     input i_tx_enable,
-    input i_link_error,
+    input i_left_run,
     input i_link_connecting,
     input i_link_run,
     input i_use_run_rate,
@@ -63,7 +61,7 @@ module tx(
     tx_spill spill0 (
         .i_sys_clk(i_sys_clk),
         .i_sys_rstn(i_sys_rstn),
-        .i_link_error(i_link_error),
+        .i_left_run(i_left_run),
         .i_host_valid(host_valid),
         .i_host_data(i_fifo_rdata),
         .o_host_pop(o_fifo_pop),

@@ -29,6 +29,7 @@ module state_machine (
     output reg o_fct_allowed, // High in {Connecting, Run}
     output reg o_link_run, // High in {Run}
     output reg o_link_error, // one cycle pulse after a fault in Run
+    output reg o_left_run, // one cycle pulse after leaving Run
     output e_link_state o_state
 
 );
@@ -57,7 +58,7 @@ module state_machine (
     wire timeout_12u8 = timer >= T_12U8_CYCLES;
 
 
-    logic next_tx_enable, next_rx_enable, next_fct_allowed, next_link_run, next_link_error;
+    logic next_tx_enable, next_rx_enable, next_fct_allowed, next_link_run, next_link_error, next_left_run;
     always_ff @(posedge i_sys_clk or negedge i_sys_rstn) begin
         if (!i_sys_rstn) begin
             state <= LINK_ST_ERROR_RESET;
@@ -67,6 +68,7 @@ module state_machine (
             o_fct_allowed <= 0;
             o_link_run <= 0;
             o_link_error <= 0;
+            o_left_run <= 0;
         end else begin
             state <= next_state;
             o_tx_enable <= next_tx_enable;
@@ -74,6 +76,7 @@ module state_machine (
             o_fct_allowed <= next_fct_allowed;
             o_link_run <= next_link_run;
             o_link_error <= next_link_error;
+            o_left_run <= next_left_run;
         end
     end
 
@@ -81,9 +84,10 @@ module state_machine (
         next_state = state;
         timer_en = 1'b0;
         timer_clear = 1'b0;
-        // this is the only output here because we want it to be
-        // a pulse when going from Run to ErrorReset
+        // these outputs are set here because they are pulses
+        // on the Run -> ErrorReset edge
         next_link_error = 0;
+        next_left_run = 0;
 
         case (state)
             LINK_ST_ERROR_RESET: begin
@@ -142,6 +146,7 @@ module state_machine (
                 if (rx_error | credit_error | i_link_disable) begin
                     next_state = LINK_ST_ERROR_RESET;
                     next_link_error = rx_error | credit_error;
+                    next_left_run = 1'b1;
                     timer_clear = 1'b1;
                 end
             end

@@ -1,308 +1,206 @@
-module codec #(
-    parameter int DEPTH_FIFO = 64,
-    parameter int DATA_WIDTH_FIFO = 9,
-    parameter int CLK_FREQ = 10_000_000,
-    parameter int SYS_CLK_FREQ_HZ = 50_000_000,
-    parameter int REF_TX_FREQ_HZ = 200_000_000,
-    parameter int DISCONNECT_TIMEOUT_NS = 850,
-    parameter int DSIZE = 10,
-    parameter int ASIZE = 4
+import spw_pkg::*;
+
+module spw_codec #(
+    parameter int RX_AW       = 6,        // receive buffer: 2**RX_AW entries (64)
+    parameter int TX_AW       = 6         // host TX FIFO:   2**TX_AW entries (64)
 )(
-    input clk_system, // máquina de estados 50 MHz
-    input clk_ref_tx, // referência do tx 200 MHz
-    input [7:0] div_counter_tx,
+    // ---------------- clocks and resets ----------------
+    input  logic        i_sys_clk,          // 50 MHz system clock
+    input  logic        i_tx_clk,           // free-running 200 MHz, TX domain
+    input  logic        i_sys_rstn,        // global reset, synchronized to clk_sys
+    input  logic        i_tx_rstn,         // global reset, synchronized to clk_tx
 
-    input rst_n,
+    // ---------------- SpaceWire line ----------------
+    input  logic        i_D, i_S,      // from the input pads (async)
+    output logic        o_D, o_S,     // to the output pads (TX domain flops)
 
-    input S_in,
-    input D_in,
-    output S_out,
-    output D_out,
+    // ---------------- host transmit (packets to send) ----------------
+    input  logic        i_tx_wr,
+    input  logic [8:0]  i_tx_wdata,         // {ctrl, data}: data, EOP, EEP
+    output logic        o_tx_full,
 
-    //matrix de roteamento
-    input [DATA_WIDTH_FIFO-1:0] SpW_Packet_TX, 
-    input SpW_Packet_TX_en,
-    output full_tx_fifo,
-    output [DATA_WIDTH_FIFO-1:0] SpW_Packet_RX,
-    input SpW_Packet_RX_en,
-    output empty_rx_fifo,
+    // ---------------- host receive (packets received) ----------------
+    input  logic        i_rx_rd,
+    output logic [8:0]  o_rx_rdata,         // {ctrl, data}, first-word fall-through
+    output logic        o_rx_valid,         // !empty
 
-    // timecode
-    input [7:0] time_in,
-    input tick_in,
-    output [7:0] time_out,
-    output tick_out
+    // ---------------- time-codes ----------------
+    input  logic        i_tick,          // one-cycle pulse
+    input  logic [7:0]  i_timecode,
+    output logic        o_tick,         // one-cycle pulse, no backpressure
+    output logic [7:0]  o_timecode,
+
+    // ---------------- link control ----------------
+    input  logic        i_link_start,
+    input  logic        i_auto_start,
+    input  logic        i_link_disable,
+    input  logic [6:0]  i_run_div,          // run-rate divider; change only while the link is down
+
+    // ---------------- status ----------------
+    output e_link_state o_link_state,       // state machine state
+    output logic        o_link_run,
+    output logic        o_link_error // pulsed when the link detected an error
 );
+    localparam int RX_DEPTH = 1 << RX_AW;
 
-    localparam int DIV_10MHz = (REF_TX_FREQ_HZ / (2*CLK_FREQ));
+    // ---- state machine signals ----
+    wire fsm_tx_enable, fsm_rx_enable, fsm_fct_allowed, fsm_link_run, fsm_link_error, fsm_left_run;
 
-    logic clk_tx;
-    logic [7:0] limit_counter_tx;
-    logic run_state;
-    assign limit_counter_tx = run_state ? div_counter_tx : DIV_10MHz;
+    e_link_state fsm_state;
+    wire link_connecting = fsm_state == LINK_ST_CONNECTING;
 
-    var_clk_divider u_var_clk_divider (
-        .clk(clk_ref_tx),
-        .rst_n(rst_n),
-        .new_limit(limit_counter_tx),
-        .clk_out(clk_tx)
+    // ---- RX -> FSM ----
+    wire rx_got_null, rx_got_fct, rx_got_nchar, rx_got_timecode;
+    wire rx_disconnect, rx_parity_err, rx_esc_err, rx_afifo_overflow, rx_credit_err;
+
+    // ---- credit signals ----
+    wire [3:0] rx_fct_delta;
+    wire rx_write;
+    wire tx_nchar_accept, tx_fct_accept;
+    wire tx_has_credit, tx_fct_due, rx_has_credit;
+    wire tx_credit_err;
+
+    // ---- buffers ----
+    wire rxbuf_wr, rxbuf_full, rx_buf_empty;
+    wire [8:0] rxbuf_wdata;
+    wire [RX_AW:0] rxbuf_count;
+
+    wire txbuf_pop, txbuf_empty;
+    wire [8:0] txbuf_rdata;
+
+
+    state_machine fsm (
+        .i_sys_clk(i_sys_clk),
+        .i_sys_rstn(i_sys_rstn),
+        .i_link_start(i_link_start),
+        .i_auto_start(i_auto_start),
+        .i_link_disable(i_link_disable),
+        // room for the first FCT is the same condition as `fct_due`
+        .i_rx_space_ok(tx_fct_due),
+        .i_rx_got_null(rx_got_null),
+        .i_rx_got_fct(rx_got_fct),
+        .i_rx_got_nchar(rx_got_nchar),
+        .i_rx_got_timecode(rx_got_timecode),
+        .i_rx_parity_err(rx_parity_err),
+        .i_rx_esc_err(rx_esc_err),
+        .i_rx_overflow_err(rx_afifo_overflow),
+        .i_disconnect(rx_disconnect),
+        .i_rx_credit_err(rx_credit_err),
+        .i_tx_credit_err(tx_credit_err),
+        .o_tx_enable(fsm_tx_enable),
+        .o_rx_enable(fsm_rx_enable),
+        .o_fct_allowed(fsm_fct_allowed),
+        .o_link_run(fsm_link_run),
+        .o_link_error(fsm_link_error),
+        .o_left_run(fsm_left_run),
+        .o_state(fsm_state)
     );
 
-    logic [8:0] wr_data_fifo_rx, rd_data_fifo_tx, rd_data_fifo_tx_temp;
-    logic wr_en_fifo_rx, rd_en_fifo_tx, rd_en_fifo_tx_temp, empty_tx_fifo, empty_tx_fifo_temp;
-
-    logic credit_err;
-    logic [$clog2(DEPTH_FIFO):0] free_slots_fifo_rx;
-
-
-    sync_fifo #(.DSIZE(DATA_WIDTH_FIFO), .ASIZE($clog2(DEPTH_FIFO))) u_rx_fifo(  
-        .clk(clk_system),
-        .rst_n(rst_n),
-
-        .wdata(wr_data_fifo_rx),
-        .winc(wr_en_fifo_rx),
-
-        // saída do módulo
-        .rinc(SpW_Packet_RX_en),
-        .rdata(SpW_Packet_RX),
-        .rempty(empty_rx_fifo),
-        .free_space_o(free_slots_fifo_rx)
+    credit #(
+        .FIFO_DEPTH(RX_DEPTH)
+    ) credit0 (
+        .i_sys_clk(i_sys_clk),
+        .i_sys_rstn(i_sys_rstn),
+        .i_rx_enable(fsm_rx_enable),
+        .i_fct_allowed(fsm_fct_allowed),
+        .i_tx_nchar_accept(tx_nchar_accept),
+        .i_tx_fct_accept(tx_fct_accept),
+        .o_tx_has_credit(tx_has_credit),
+        .o_tx_fct_due(tx_fct_due),
+        .i_rx_fct_delta(rx_fct_delta),
+        .i_rx_write(rx_write),
+        .i_rx_fifo_count(rxbuf_count),
+        .o_rx_has_credit(rx_has_credit),
+        .o_credit_error(tx_credit_err)
     );
 
-    assign credit_err = (free_slots_fifo_rx == '0) & wr_en_fifo_rx;
-
-    async_fifo #(.DSIZE(DATA_WIDTH_FIFO), .ASIZE($clog2(DEPTH_FIFO))) u_tx_fifo(  
-        .wfull(full_tx_fifo),
-        .wdata(SpW_Packet_TX),
-        .winc(SpW_Packet_TX_en), 
-        .wclk(clk_system),
-        .wrst_n(rst_n),
-        
-        .rempty(empty_tx_fifo_temp),
-        .rdata(rd_data_fifo_tx_temp),
-        .rinc(rd_en_fifo_tx_temp),
-        .rclk(clk_tx),
-        .rrst_n(rst_n)  // TODO ver a questão de cdc
+    rx rx0 (
+        .i_sys_clk(i_sys_clk),
+        .i_sys_rstn(i_sys_rstn),
+        .i_rx_enable(fsm_rx_enable),
+        .i_link_run(fsm_link_run),
+        .i_D(i_D),
+        .i_S(i_S),
+        .i_fifo_full(rxbuf_full),
+        .o_nchar_wr(rxbuf_wr),
+        .o_nchar(rxbuf_wdata),
+        .o_tick(o_tick),
+        .o_timecode(o_timecode),
+        .o_fct_delta(rx_fct_delta),
+        .o_rx_write(rx_write),
+        .i_has_credit(rx_has_credit),
+        .o_got_null(rx_got_null),
+        .o_got_fct(rx_got_fct),
+        .o_got_nchar(rx_got_nchar),
+        .o_got_timecode(rx_got_timecode),
+        .o_disconnect(rx_disconnect),
+        .o_parity_error(rx_parity_err),
+        .o_esc_error(rx_esc_err),
+        .o_afifo_overflow(rx_afifo_overflow),
+        .o_credit_error(rx_credit_err)
     );
 
-    // Módulo para lisar com os erros, colocando EEP no final e esvaziando até o EOP
-    // TODO verificar se isso pode dar conflito se o EOP estiver muito longo
-    logic rx_Error, parity_err, escape_err;
-    logic disconnect, start_link;
+    // receive buffer, read by the host
+    fifo #(
+        .ASIZE(RX_AW),
+        .DSIZE(9)
+    ) rx_buf (
+        .i_clk(i_sys_clk),
+        .i_rstn(i_sys_rstn),
+        .i_wr(rxbuf_wr),
+        .i_rd(i_rx_rd),
+        .i_wdata(rxbuf_wdata),
+        .o_rdata(o_rx_rdata),
+        .o_empty(rx_buf_empty),
+        .o_full(rxbuf_full),
+        .o_count(rxbuf_count)
+    );
+    assign o_rx_valid = !rx_buf_empty;
 
-    error_cleanup_fsm u_error_cleanup_fsm (
-        .clk_system (clk_system),
-        .clk_tx (clk_tx),
-        .rst_n (rst_n),
-        .run_state (run_state),
-        .rx_Error (rx_Error),
-        .disconnect (disconnect),
-        .credit_err (credit_err),
-        .rd_en_fifo_tx (rd_en_fifo_tx),
-        .empty_tx_fifo_temp (empty_tx_fifo_temp),
-        .rd_data_fifo_tx_temp (rd_data_fifo_tx_temp),
-        .rd_data_fifo_tx (rd_data_fifo_tx),
-        .rd_en_fifo_tx_temp (rd_en_fifo_tx_temp),
-        .empty_tx_fifo (empty_tx_fifo)
+    // transmit buffer, written by the host
+    fifo #(
+        .ASIZE(TX_AW),
+        .DSIZE(9)
+    ) tx_buf (
+        .i_clk(i_sys_clk),
+        .i_rstn(i_sys_rstn),
+        .i_wr(i_tx_wr),
+        .i_rd(txbuf_pop),
+        .i_wdata(i_tx_wdata),
+        .o_rdata(txbuf_rdata),
+        .o_empty(txbuf_empty),
+        .o_full(o_tx_full),
+        .o_count()
     );
 
-    logic got_data, got_fct, got_eop, got_eep, got_null, got_timecode;
-
-    logic [7:0] payload;
-    logic sending_allowed;
-    logic send_fct, send_fct_fc, send_fct_sm;
-    assign send_fct = send_fct_fc | send_fct_sm;
-
-    logic rst_n_rx, rst_n_tx;
-
-    flow_control #(.DEPTH_FIFO(DEPTH_FIFO)) u_fc(
-        .clk(clk_system),
-        .rst_n(rst_n & rst_n_rx & rst_n_tx), // TODO falta arrumar aqui para ele funcionar com o rst da máquina de estado quadno rst o tx eo rx
-        .run_state(run_state),
-        .en_out_fifo_tx(!empty_tx_fifo_temp & rd_en_fifo_tx),
-        .got_FCT_rx(got_fct),
-        .sending_allowed(sending_allowed),
-        .en_in_fifo_rx(wr_en_fifo_rx),
-        .free_slots_fifo_rx(free_slots_fifo_rx),
-        .send_FCT(send_fct_fc)
+    tx tx0 (
+        .i_tx_clk(i_tx_clk),
+        .i_tx_rstn(i_tx_rstn),
+        .i_sys_clk(i_sys_clk),
+        .i_sys_rstn(i_sys_rstn),
+        .i_clk_div(i_run_div),
+        .i_tx_enable(fsm_tx_enable),
+        .i_left_run(fsm_left_run),
+        .i_link_connecting(link_connecting),
+        .i_link_run(fsm_link_run),
+        // 10 Mb/s until Run, then the configured rate
+        .i_use_run_rate(fsm_link_run),
+        .i_fifo_empty(txbuf_empty),
+        .i_fifo_rdata(txbuf_rdata),
+        .o_fifo_pop(txbuf_pop),
+        .i_tick_in(i_tick),
+        .i_timecode(i_timecode),
+        .i_has_credit(tx_has_credit),
+        .i_fct_due(tx_fct_due),
+        .o_nchar_accept(tx_nchar_accept),
+        .o_fct_accept(tx_fct_accept),
+        .o_D(o_D),
+        .o_S(o_S)
     );
 
-    logic got_bit;
-    assign rx_Error = escape_err | parity_err;
-
-    logic en_rx; // TODO analisar depois se os módulos possuem um sinal para ativar
-    logic en_tx; // TODO analisar depois se os módulos possuem um sinal para ativar
-    logic send_null;
-    assign start_link = 1; // TODO verificar o que seria essa start_link, mas creio
-                           // que seja um sinal externo para controle de quandoa ativar o rx
-
-    state_machine #(.CLK_FREQ(SYS_CLK_FREQ_HZ))u_sm( // a máquina de estados roda em clk_system
-        .clk(clk_system),
-        .rst_n(rst_n),
-
-        // RX
-        .en_rx(en_rx), // TODO analisar depois se os módulos possuem um sinal para ativar
-        .rst_n_rx(rst_n_rx),
-        .got_bit(got_bit),
-        .got_FCT(got_fct),
-        .got_null(got_null),
-        .got_TimeCode(got_timecode),
-        .got_N_Char(got_data),
-        .rx_Error(rx_Error),
-
-        // TX
-        .en_tx(en_tx), // TODO analisar depois se os módulos possuem um sinal para ativar
-        .rst_n_tx(rst_n_tx),
-        .send_FCT(send_fct_sm),
-        .send_Null(send_null),
-
-        // FSM
-        .disconnect(disconnect),
-        .start_link(start_link),
-        .run_state(run_state)
-    );
-
-    logic [9:0] wr_data_fifo_sync, rd_data_fifo_sync;
-    logic wr_en_fifo_sync, rd_en_fifo_sync, rd_empty_fifo_sync;
-    logic got_bit_clk_ref_tx, parity_err_clk_ref_tx, escape_err_clk_ref_tx;
-
-    rx u_rx (
-        .clk(clk_ref_tx),
-        .rst_n(rst_n_rx),
-        .D_in(D_in),
-        .S_in(S_in),
-        .data_o(wr_data_fifo_sync),
-        .data_valid_o(wr_en_fifo_sync),
-        .got_bit_o(got_bit_clk_ref_tx),
-        .parity_err_o(parity_err_clk_ref_tx),
-        .escape_err_o(escape_err_clk_ref_tx)
-    );
-
-    cdc_sync #(.STAGES(2)) u_got_bit_sync (
-        .clk(clk_system),
-        .d(got_bit_clk_ref_tx),
-        .q(got_bit)
-    );
-
-    cdc_sync #(.STAGES(2)) u_parity_err_sync (
-        .clk(clk_system),
-        .d(parity_err_clk_ref_tx),
-        .q(parity_err)
-    );
-
-    cdc_sync #(.STAGES(2)) u_escape_err_sync (
-        .clk(clk_system),
-        .d(escape_err_clk_ref_tx),
-        .q(escape_err)
-    );
-
-    logic [1:0] wrst_n_sync_ff;
-    logic  wrst_n_sync;
-
-    logic rst_n_rx_final;
-    assign rst_n_rx_final = rst_n & rst_n_rx;
-
-    always_ff @(posedge clk_ref_tx or negedge rst_n_rx_final) begin
-        if (!rst_n_rx_final)
-            wrst_n_sync_ff <= 2'b00;
-        else
-            wrst_n_sync_ff <= {wrst_n_sync_ff[0], 1'b1};
-    end
-
-    assign wrst_n_sync = wrst_n_sync_ff[1];
-
-    async_fifo #(.DSIZE(DSIZE), .ASIZE(ASIZE)) u_fifo_sync_rx(  
-        .wfull(), // TODO colocar isso no teste, se der alto sinalizar erro
-        .rempty(rd_empty_fifo_sync),
-        .wdata(wr_data_fifo_sync),
-        .winc(wr_en_fifo_sync), 
-        .wclk(clk_ref_tx),
-        .wrst_n(wrst_n_sync),
-        .rdata(rd_data_fifo_sync),
-        .rinc(rd_en_fifo_sync),
-        .rclk(clk_system),
-        .rrst_n(rst_n)
-    );
-
-    localparam int unsigned DISCONNECT_TIMEOUT_CYCLES =
-        int'((longint'(DISCONNECT_TIMEOUT_NS) * longint'(SYS_CLK_FREQ_HZ)) / 1_000_000_000);
-
-    localparam int CNT_WIDTH = $clog2(DISCONNECT_TIMEOUT_CYCLES + 1);
-
-    logic [CNT_WIDTH-1:0]  disconnect_cnt;
-
-    always_ff @(posedge clk_system or negedge rst_n) begin
-        if (!rst_n) begin
-            disconnect_cnt <= '0;
-            disconnect     <= 1'b0;
-        end
-        else if (!run_state) begin
-            disconnect_cnt <= '0;
-            disconnect     <= 1'b0;
-        end
-        else begin
-            disconnect <= 1'b0;
-            if (got_bit) begin
-                disconnect_cnt <= '0;
-            end
-            else if (disconnect_cnt == (DISCONNECT_TIMEOUT_CYCLES - 1)) begin
-                disconnect     <= 1'b1;
-                disconnect_cnt <= '0;
-            end
-            else begin
-                disconnect_cnt <= disconnect_cnt + 1'b1;
-            end
-        end
-    end
-
-
-    // decode
-    spw_char_decode u_spw_char_decode(
-        .clk_system(clk_system),
-        .rst_n(rst_n),
-        .rd_data_fifo_sync(rd_data_fifo_sync),
-        .rd_en_fifo_sync(rd_en_fifo_sync),
-        .rd_empty_fifo_sync(rd_empty_fifo_sync),
-        .payload(payload),
-        .is_data(got_data),
-        .is_fct(got_fct),
-        .is_eep(got_eep),
-        .is_eop(got_eop),
-        .is_null(got_null),
-        .is_timecode(got_timecode)
-    );
-
-    assign Time_Code_RX = (got_timecode == 1) ? payload : '0;
-    assign Time_Code_RX_valid = got_timecode;
-    assign wr_en_fifo_rx = got_data | got_eep | got_eop;
-
-    always_comb begin
-        case ({got_data, got_eep, got_eop})
-            3'b001: wr_data_fifo_rx = {1'b1, 6'b0, 2'b10}; // eop
-            3'b010: wr_data_fifo_rx = {1'b1, 6'b0, 2'b01}; // eep
-            3'b100: wr_data_fifo_rx = {1'b0, payload}; // data
-            default: wr_data_fifo_rx = '0;
-        endcase
-    end
-
-    logic bit_tick; //TODO falta conectar
-    assign bit_tick = 1'b1;
-
-    tx u_tx(
-        .clk_tx(clk_tx),
-        .clk_system(clk_system),
-        .rst_n(rst_n_tx),
-        .D_out(D_out),
-        .S_out(S_out),
-        .rd_en_fifo(rd_en_fifo_tx),
-        .rd_data_fifo(rd_data_fifo_tx), 
-        .empty_fifo(empty_tx_fifo),
-        .run_state(run_state),
-        .bit_tick_i(bit_tick),
-        .send_fct_i(send_fct),
-        .send_null_i(send_null),
-        .send_timecode_i(Time_Code_TX_valid),
-        .timecode_i(Time_Code_TX)
-    );
+    assign o_link_state = fsm_state;
+    assign o_link_run = fsm_link_run;
+    assign o_link_error = fsm_link_error;
 
 endmodule
+

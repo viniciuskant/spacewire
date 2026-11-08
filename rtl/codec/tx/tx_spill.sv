@@ -1,13 +1,13 @@
 
 // Module responsible for spilling the rest of a packet
-// waiting in the TX FIFO after a link error.
+// waiting in the TX FIFO after the link leaves Run.
 // Sits between the TX FIFO and the TX selector
 // CDC:
 // Stays fully in the system clock domain
 module tx_spill (
     input i_sys_clk,
     input i_sys_rstn,
-    input i_link_error,
+    input i_left_run,
     // host side
     input i_host_valid,
     input [8:0] i_host_data,
@@ -41,9 +41,9 @@ module tx_spill (
             in_packet <= 0;
             spilling <= 0;
         end else begin
-            in_packet <= i_link_error ? 1'b0 : in_packet_next;
+            in_packet <= i_left_run ? 1'b0 : in_packet_next;
 
-            if (i_link_error && in_packet_next) begin
+            if (i_left_run && in_packet_next) begin
                 spilling <= 1'b1;
             end else if (discard && is_eop_eep) begin
                 spilling <= 1'b0;

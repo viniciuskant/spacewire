@@ -9,31 +9,31 @@ module rx_link_mon (
     input [3:0] i_fct_delta, // from CDC boundary
     input [3:0] i_act_pos_delta, // from CDC boundary
     input [3:0] i_act_neg_delta, // from CDC boundary
-    output logic o_got_bit, // sticky flag
     output o_got_fct,
     output o_disconnect
 );
 
 localparam CTR_WIDTH = $clog2(DISCONNECT_CYCLES + 1);
 
+logic got_bit;
 assign o_got_fct = i_fct_delta != 0;
 wire activity = (i_act_neg_delta != 0) || (i_act_pos_delta != 0);
 
 
 logic [CTR_WIDTH-1:0] quiet_cnt;
 
-assign o_disconnect = o_got_bit && (quiet_cnt == DISCONNECT_CYCLES);
+assign o_disconnect = got_bit && (quiet_cnt == DISCONNECT_CYCLES);
 always_ff @(posedge i_sys_clk or negedge i_sys_rstn) begin
     if (!i_sys_rstn) begin
         quiet_cnt <= 0;
-        o_got_bit <= 0;
+        got_bit <= 0;
     end else if (!i_rx_enable) begin
         quiet_cnt <= 0;
-        o_got_bit <= 0;
+        got_bit <= 0;
     end else begin
-        if (activity) o_got_bit <= 1;
+        if (activity) got_bit <= 1;
         // we only want to start counting if we already received a bit
-        if (!o_got_bit || activity) quiet_cnt <= '0;
+        if (!got_bit || activity) quiet_cnt <= '0;
         else if (quiet_cnt != DISCONNECT_CYCLES) quiet_cnt <= quiet_cnt + 1;
     end
 end
@@ -48,16 +48,16 @@ default disable iff (!i_sys_rstn);
 a_cnt_range:   assert property (quiet_cnt <= DISCONNECT_CYCLES);
 
 // no disconnect without a first bit, and none while the receiver is disabled
-a_disc_armed:  assert property (o_disconnect |-> o_got_bit);
+a_disc_armed:  assert property (o_disconnect |-> got_bit);
 a_disc_rxen:   assert property (!i_rx_enable |-> !o_disconnect);
 
 // --- got_bit behavior ---
 // cleared while the receiver is disabled
-a_gb_clear:    assert property (!i_rx_enable |=> !o_got_bit);
+a_gb_clear:    assert property (!i_rx_enable |=> !got_bit);
 // only rises because of activity
-a_gb_rise:     assert property ($rose(o_got_bit) |-> $past(activity));
+a_gb_rise:     assert property ($rose(got_bit) |-> $past(activity));
 // stays set until the receiver is disabled
-//a_gb_sticky:   assert property (o_got_bit && i_rx_enable |=> o_got_bit || !$past(i_rx_enable));
+//a_gb_sticky:   assert property (got_bit && i_rx_enable |=> got_bit || !$past(i_rx_enable));
 
 // --- disconnect timing ---
 // never early: within CONNECT_CYCLES quiet cycles after activity, no disconnect

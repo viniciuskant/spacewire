@@ -25,3 +25,4 @@ rtl/codec/rx/rx.sv
 
 rtl/codec/credit.sv
 rtl/codec/state_machine.sv
+rtl/codec/codec.sv

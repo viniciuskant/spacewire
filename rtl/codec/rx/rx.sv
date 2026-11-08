@@ -24,7 +24,6 @@ module rx(
     // FSM signals
     input i_has_credit,
     output o_got_null,
-    output o_got_bit,
     output o_got_fct,
     output o_got_nchar,
     output o_got_timecode,
@@ -189,7 +188,6 @@ rx_link_mon mon(
     .i_fct_delta(cdc_sys_fct_delta),
     .i_act_pos_delta(cdc_sys_act_pos_cnt),
     .i_act_neg_delta(cdc_sys_act_neg_cnt),
-    .o_got_bit(o_got_bit),
     .o_got_fct(o_got_fct),
     .o_disconnect(o_disconnect)
 );
