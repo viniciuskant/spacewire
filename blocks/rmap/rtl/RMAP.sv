@@ -1,3 +1,6 @@
+// TODO analisar um caso que acabei de pensar depois, mas se ocorre um erro e depois ocorre um erro que não e o EOP isso pode quebrar a máquina de estados
+// ver de criar um "counter externo que sinaliza um erro de Cargo too large
+
 module RMAP (
     input logic clk,
     input logic rst_n,
@@ -15,6 +18,7 @@ module RMAP (
     output logic [8:0] reg_bank_r_addr,
     output logic reg_bank_r_en,
 
+    input logic tx_fifo_full,
     output logic busy
 );
 
@@ -596,180 +600,221 @@ module RMAP (
 
             TX_SRC_PATH_ADDRESS: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = {1'b0, bank_src_path_addr[tx_cnt_src_path_addr]};
-                if (tx_cnt_src_path_addr == tx_reg_src_path_addr_valid_len - 1) next_state = TX_SRC_LOGICAL_ADDRESS;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = {1'b0, bank_src_path_addr[tx_cnt_src_path_addr]};
+                    if (tx_cnt_src_path_addr == tx_reg_src_path_addr_valid_len - 1) next_state = TX_SRC_LOGICAL_ADDRESS;
+                end
             end
 
             TX_SRC_LOGICAL_ADDRESS: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = {1'b0, tx_reg_src_logical_addr};
-                next_state = TX_PROTOCOL_ID;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = {1'b0, tx_reg_src_logical_addr};
+                    next_state = TX_PROTOCOL_ID;
+                end
             end
 
             TX_PROTOCOL_ID: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = 8'h01;
-                next_state = TX_COMMAND_BYTE;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = 8'h01;
+                    next_state = TX_COMMAND_BYTE;
+                end
             end
+
 
             TX_COMMAND_BYTE: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = {1'b0, 2'b00, tx_reg_command, tx_reg_src_path_addr_len[3:2]};
-                next_state = TX_STATUS_STATE;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = {1'b0, 2'b00, tx_reg_command, tx_reg_src_path_addr_len[3:2]};
+                    next_state = TX_STATUS_STATE;
+                end
             end
+
 
             TX_STATUS_STATE: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = {4'h0, tx_status};
-                next_state = TX_DESTINATION_LOGICAL_ADDRESS;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = {4'h0, tx_status};
+                    next_state = TX_DESTINATION_LOGICAL_ADDRESS;
+                end
             end
+
 
             TX_DESTINATION_LOGICAL_ADDRESS: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = 9'h0fe;
-                next_state = TX_TRANSACTION_ID_MS;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = 9'h0fe;
+                    next_state = TX_TRANSACTION_ID_MS;  
+                end
             end
+
 
             TX_TRANSACTION_ID_MS: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = tx_transaction_id[15:8];
-                next_state = TX_TRANSACTION_ID_LS;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = tx_transaction_id[15:8];
+                    next_state = TX_TRANSACTION_ID_LS;
+                end
             end
+
 
             TX_TRANSACTION_ID_LS: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = tx_transaction_id[7:0];
-                if (tx_status == '0)
-                    case(tx_reg_command)
-                        CMD_READ_SINGLE: next_state = TX_RESERVED; 
-                        CMD_READ_INC: next_state = TX_RESERVED; 
-                        CMD_READ_MODIFY_WRITE: next_state = TX_RESERVED; 
-                        CMD_WRITE: next_state = TX_REPLY_CRC; 
-                    endcase
-                else begin // TODO tratamento de erro, não sei se está correto
-                    next_state = TX_REPLY_CRC; 
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = tx_transaction_id[7:0];
+                    if (tx_status == '0)
+                        case(tx_reg_command)
+                            CMD_READ_SINGLE: next_state = TX_RESERVED; 
+                            CMD_READ_INC: next_state = TX_RESERVED; 
+                            CMD_READ_MODIFY_WRITE: next_state = TX_RESERVED; 
+                            CMD_WRITE: next_state = TX_REPLY_CRC; 
+                        endcase
+                    else begin // TODO tratamento de erro, não sei se está correto
+                        next_state = TX_REPLY_CRC; 
+                    end
                 end
             end 
 
             TX_RESERVED: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = '0;
-                next_state = TX_DATA_LENGTH_MS;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = '0;
+                    next_state = TX_DATA_LENGTH_MS;
+                end
             end
 
             TX_DATA_LENGTH_MS: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = tx_data_len[23:16];
-                next_state = TX_DATA_LENGTH;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = tx_data_len[23:16];
+                    next_state = TX_DATA_LENGTH;
+                end
             end
-
+            
             TX_DATA_LENGTH: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = tx_data_len[15:8];
-                next_state = TX_DATA_LENGTH_LS;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = tx_data_len[15:8];
+                    next_state = TX_DATA_LENGTH_LS;
+                end
             end
 
             TX_DATA_LENGTH_LS: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = tx_data_len[7:0];
-                next_state = TX_HEADER_CRC;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = tx_data_len[7:0];
+                    next_state = TX_HEADER_CRC;
+                end
             end
 
             TX_HEADER_CRC: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = {1'b0, tx_crc_reg};
-                case(tx_reg_command)
-                    CMD_READ_SINGLE: begin
-                        next_state = TX_DATA_STATE; 
-                        tx_reg_bank_r_en = 1'b1;
-                    end
-                    CMD_READ_INC: begin
-                        next_state = TX_DATA_STATE; 
-                        tx_reg_bank_r_en = 1'b1;
-                    end
-                    CMD_READ_MODIFY_WRITE: begin
-                        reg_bank_r_addr = tx_reg_bank_r_addr;
-                        reg_bank_r_en = 1'b1;
-                        next_state = TX_COMMAND_RMW_STATE; 
-                    end
-                    default: next_state = TX_EOP_STATE;
-                endcase
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = {1'b0, tx_crc_reg};
+                    case(tx_reg_command)
+                        CMD_READ_SINGLE: begin
+                            next_state = TX_DATA_STATE; 
+                            tx_reg_bank_r_en = 1'b1;
+                        end
+                        CMD_READ_INC: begin
+                            next_state = TX_DATA_STATE; 
+                            tx_reg_bank_r_en = 1'b1;
+                        end
+                        CMD_READ_MODIFY_WRITE: begin
+                            reg_bank_r_addr = tx_reg_bank_r_addr;
+                            reg_bank_r_en = 1'b1;
+                            next_state = TX_COMMAND_RMW_STATE; 
+                        end
+                        default: next_state = TX_EOP_STATE;
+                    endcase
+                end
             end
 
 
             TX_COMMAND_RMW_STATE: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                case (tx_cnt_data_byte) 
-                    2'b00: begin
-                        reg_bank_w_addr = tx_reg_bank_r_addr;
-                        reg_bank_w_en = 1'b1;
-                        reg_bank_w_data = (rx_mask_write & rx_data_write) | ((~rx_mask_write) & reg_bank_r_data);
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    case (tx_cnt_data_byte) 
+                        2'b00: begin
+                            reg_bank_w_addr = tx_reg_bank_r_addr;
+                            reg_bank_w_en = 1'b1;
+                            reg_bank_w_data = (rx_mask_write & rx_data_write) | ((~rx_mask_write) & reg_bank_r_data);
 
-                        tx_data = {1'b0, reg_bank_r_data[31:24]};
+                            tx_data = {1'b0, reg_bank_r_data[31:24]};
+                        end
+                        2'b01: tx_data = {1'b0, tx_reg_rmw_data[23:16]};
+                        2'b10: tx_data = {1'b0, tx_reg_rmw_data[15:8]};
+                        2'b11: tx_data = {1'b0, tx_reg_rmw_data[7:0]};
+                    endcase
+                    if (tx_cnt_data == tx_data_words - 1 && tx_cnt_data_byte == 2'b11) begin
+                        next_state = TX_DATA_CRC;
                     end
-                    2'b01: tx_data = {1'b0, tx_reg_rmw_data[23:16]};
-                    2'b10: tx_data = {1'b0, tx_reg_rmw_data[15:8]};
-                    2'b11: tx_data = {1'b0, tx_reg_rmw_data[7:0]};
-                endcase
-                if (tx_cnt_data == tx_data_words - 1 && tx_cnt_data_byte == 2'b11) begin
-                    next_state = TX_DATA_CRC;
                 end
             end
 
             TX_DATA_STATE: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                case (tx_cnt_data_byte) 
-                    2'b00: tx_data = {1'b0, reg_bank_r_data[31:24]};
-                    2'b01: tx_data = {1'b0, reg_bank_r_data_reg[23:16]};
-                    2'b10: tx_data = {1'b0, reg_bank_r_data_reg[15:8]};
-                    2'b11: tx_data = {1'b0, reg_bank_r_data_reg[7:0]};
-                endcase
-                if (tx_cnt_data == tx_data_words - 1 && tx_cnt_data_byte == 2'b11) begin
-                    next_state = TX_DATA_CRC;
-                end else if (tx_cnt_data_byte == 2'b11) begin
-                    tx_reg_bank_r_en = 1'b1;
-                end else begin
-                    tx_reg_bank_r_en = 1'b0; // Desativa após pedir
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    case (tx_cnt_data_byte) 
+                        2'b00: tx_data = {1'b0, reg_bank_r_data[31:24]};
+                        2'b01: tx_data = {1'b0, reg_bank_r_data_reg[23:16]};
+                        2'b10: tx_data = {1'b0, reg_bank_r_data_reg[15:8]};
+                        2'b11: tx_data = {1'b0, reg_bank_r_data_reg[7:0]};
+                    endcase
+                    if (tx_cnt_data == tx_data_words - 1 && tx_cnt_data_byte == 2'b11) begin
+                        next_state = TX_DATA_CRC;
+                    end else if (tx_cnt_data_byte == 2'b11) begin
+                        tx_reg_bank_r_en = 1'b1;
+                    end else begin
+                        tx_reg_bank_r_en = 1'b0; // Desativa após pedir
+                    end
                 end
             end
 
             TX_DATA_CRC: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = {1'b0, tx_crc_reg};
-                next_state = TX_EOP_STATE;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = {1'b0, tx_crc_reg};
+                    next_state = TX_EOP_STATE;
+                end
             end
 
             TX_REPLY_CRC: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = {1'b0, tx_crc_reg};
-                reg_bank_w_addr = tx_reg_bank_r_addr;
-                reg_bank_w_en = 1'b1;
-                reg_bank_w_data = rx_data_write;
-                next_state = TX_EOP_STATE;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = {1'b0, tx_crc_reg};
+                    reg_bank_w_addr = tx_reg_bank_r_addr;
+                    reg_bank_w_en = 1'b1;
+                    reg_bank_w_data = rx_data_write;
+                    next_state = TX_EOP_STATE;
+                end
             end 
 
             TX_EOP_STATE: begin
                 busy = 1'b1;
-                tx_valid = 1'b1;
-                tx_data = EOP_PACKET;
-                next_state = RX_IDLE;
+                if (!tx_fifo_full) begin
+                    tx_valid = 1'b1;
+                    tx_data = EOP_PACKET;
+                    next_state = RX_IDLE;
+                end
             end
 
             default: next_state = RX_IDLE;

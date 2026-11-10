@@ -48,12 +48,34 @@ function run_RMAP_test {
     ./obj_dir/Vtb_RMAP
 }
 
+function run_coded_port_zero_test {
+    echo "Executando teste Port Zero"
+    verilator --top-module tb_coded_port_zero \
+        "${TESTS_DIR}/tb_coded_port_zero.sv" \
+        "${RTL_DIR}/coded_port_zero.sv" \
+        "${RTL_DIR}/fifos/sync_fifo.sv" \
+        "${RTL_DIR}/fifos/fifomem.sv" \
+        "${RTL_DIR}/fifos/rptr_empty.sv" \
+        "${RTL_DIR}/fifos/sync_r2w.sv" \
+        "${RTL_DIR}/fifos/sync_w2r.sv" \
+        "${RTL_DIR}/fifos/wptr_full.sv" \
+        "${RTL_DIR}/RMAP.sv" \
+        "${RTL_DIR}/rmap_crc8.sv" \
+        "${RTL_DIR}/rmap_reg_bank.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_RMAP
+}
+
+
 case "${nome_do_teste}" in
     rmap_crc8)
         run_rmap_crc8_test
         ;;
     RMAP)
         run_RMAP_test
+        ;;
+    coded_port_zero)
+        run_coded_port_zero_test
         ;;
     clean)
         cleanup

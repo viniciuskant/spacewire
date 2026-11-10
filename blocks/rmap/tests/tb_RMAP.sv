@@ -39,6 +39,7 @@ module tb_RMAP;
         .reg_bank_r_data(reg_bank_r_data),
         .reg_bank_r_addr(reg_bank_r_addr),
         .reg_bank_r_en(reg_bank_r_en),
+        .tx_fifo_full(0),
         .busy(busy)
     );
 
