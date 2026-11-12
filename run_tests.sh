@@ -127,6 +127,55 @@ function run_fifo_rx2fifo_test {
     ./obj_dir/Vtb_fifo1
 }
 
+function run_sw_route_table_test {
+    echo "Executando teste sw_route_table"
+    verilator --top-module tb_sw_route_table \
+        "${TESTS_DIR}/router/tb_sw_route_table.sv" \
+        "${RTL_DIR}/router/sw_route_table.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_sw_route_table
+}
+
+function run_sw_out_arb_test {
+    echo "Executando teste sw_out_arb"
+    verilator --top-module tb_sw_out_arb \
+        "${TESTS_DIR}/router/tb_sw_out_arb.sv" \
+        "${RTL_DIR}/router/sw_out_arb.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_sw_out_arb
+}
+
+function run_sw_in_ctrl_test {
+    echo "Executando teste sw_in_ctrl"
+    verilator --top-module tb_sw_in_ctrl \
+        "${TESTS_DIR}/router/tb_sw_in_ctrl.sv" \
+        "${RTL_DIR}/router/sw_in_ctrl.sv" \
+        "${RTL_DIR}/router/sw_route_table.sv" \
+        "${RTL_DIR}/fifos/sync_fifo.sv" \
+        "${RTL_DIR}/fifos/fifomem.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_sw_in_ctrl
+}
+
+function run_sw_tc_unit_test {
+    echo "Executando teste sw_tc_unit"
+    verilator --top-module tb_sw_tc_unit \
+        "${TESTS_DIR}/router/tb_sw_tc_unit.sv" \
+        "${RTL_DIR}/router/sw_tc_unit.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_sw_tc_unit
+}
+
+function run_spw_switch_test {
+    echo "Executando teste spw_switch"
+    verilator --top-module tb_spw_switch \
+        "${TESTS_DIR}/router/tb_spw_switch.sv" \
+        "${RTL_DIR}"/router/*.sv \
+        "${RTL_DIR}"/fifos/*.sv \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_spw_switch
+}
+
 
 case "${nome_do_teste}" in
     flow_control_tx)
@@ -152,6 +201,21 @@ case "${nome_do_teste}" in
         ;;
     fifo_rx2fifo)
         run_fifo_rx2fifo_test
+        ;;
+    sw_route_table)
+        run_sw_route_table_test
+        ;;
+    sw_out_arb)
+        run_sw_out_arb_test
+        ;;
+    sw_in_ctrl)
+        run_sw_in_ctrl_test
+        ;;
+    sw_tc_unit)
+        run_sw_tc_unit_test
+        ;;
+    spw_switch)
+        run_spw_switch_test
         ;;
     all)
         run_flow_control_tx_test
