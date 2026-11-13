@@ -885,7 +885,7 @@ module RMAP (
                             rx_src_path_addr_nonzero_detected <= 1'b1;
                         end
 
-                        if (!(|rx_data_reg)) begin // Mudei de  (!|rx_data_reg) por erro
+                        if (!(|rx_data_reg)) begin //FIX: Mudei de  (!|rx_data_reg) por erro
                             rx_src_path_addr_zero_detected <= 1'b1;
                         end
 

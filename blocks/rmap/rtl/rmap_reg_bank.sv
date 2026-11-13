@@ -53,7 +53,10 @@ module rmap_reg_bank (
 `else
     logic [31:0] mem [0:511];
 
-    assign rdata = mem[raddr];
+    //Antes era:
+    //assign rdata = mem[raddr];
+    //FIX: a sram entrega o dado com 1 ciclo de atraso, e aqui tentava pegar na hora 
+    always_ff @(posedge rclk) if (rclken) rdata <= mem[raddr];
 
     always_ff @(posedge wclk) begin
         if (wclken) 
