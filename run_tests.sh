@@ -176,6 +176,21 @@ function run_spw_switch_test {
     ./obj_dir/Vtb_spw_switch
 }
 
+function run_spw_router_test {
+    echo "Executando teste spw_router"
+    verilator --top-module tb_spw_router \
+        "${TESTS_DIR}/router/tb_spw_router.sv" \
+        "${RTL_DIR}"/top/*.sv \
+        "${RTL_DIR}"/router/*.sv \
+        "${RTL_DIR}"/fifos/*.sv \
+        "${SCRIPT_DIR}/blocks/rmap/rtl/RMAP.sv" \
+        "${SCRIPT_DIR}/blocks/rmap/rtl/rmap_crc8.sv" \
+        "${SCRIPT_DIR}/blocks/rmap/rtl/rmap_reg_bank.sv" \
+        "${SCRIPT_DIR}/blocks/rmap/rtl/coded_port_zero.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_spw_router
+}
+
 
 case "${nome_do_teste}" in
     flow_control_tx)
@@ -216,6 +231,9 @@ case "${nome_do_teste}" in
         ;;
     spw_switch)
         run_spw_switch_test
+        ;;
+    spw_router)
+        run_spw_router_test
         ;;
     all)
         run_flow_control_tx_test
