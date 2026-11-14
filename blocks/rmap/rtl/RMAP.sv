@@ -188,7 +188,7 @@ module RMAP (
 
     always_comb begin
         next_state = state;
-        rx_crc_data_in = rx_data[7:0];
+        rx_crc_data_in = rx_data_reg[7:0];
         reg_bank_w_en = 1'b0;
         reg_bank_w_addr = 9'h0;
         reg_bank_w_data = 32'h0;
@@ -430,14 +430,14 @@ module RMAP (
                     rx_error_detect = 1'b1;
                     rx_error_code = 4'h7;
                 end else if (rx_valid_reg && rx_cnt_target_addr == 2'b11) begin
-                    if ({rx_target_addr[23:0], rx_data_reg} < REG_BASE_ADDR_32 || {rx_target_addr[23:0], rx_data_reg} > REG_END_ADDR_32) begin
+                    if ({rx_target_addr[23:0], rx_data_reg[7:0]} < REG_BASE_ADDR_32 || {rx_target_addr[23:0], rx_data_reg[7:0]} > REG_END_ADDR_32) begin
                         next_state = RX_EOP_STATE;
                         rx_error_detect = 1'b1;
                         rx_error_code = 4'hA; //RMAP Command not implemented or not authorised
                     end else if ((rx_reg_command == CMD_WRITE || rx_reg_command == CMD_READ_MODIFY_WRITE) && 
-                            ({rx_target_addr[23:0], rx_data_reg} == ADDR_NETWORK_DISCOVERY || 
-                            {rx_target_addr[23:0], rx_data_reg} == ADDR_ROUTER_IDENTITY || 
-                            {rx_target_addr[23:0], rx_data_reg} == ADDR_DEVICE_MANUFACTURER_ID)) begin // reg READ-ONLY
+                            ({rx_target_addr[23:0], rx_data_reg[7:0]} == ADDR_NETWORK_DISCOVERY || 
+                            {rx_target_addr[23:0], rx_data_reg[7:0]} == ADDR_ROUTER_IDENTITY || 
+                            {rx_target_addr[23:0], rx_data_reg[7:0]} == ADDR_DEVICE_MANUFACTURER_ID)) begin // reg READ-ONLY
                         next_state = RX_EOP_STATE;
                         rx_error_detect = 1'b1;
                         rx_error_code = 4'hA; // RMAP Command not implemented or not authorised
@@ -508,7 +508,7 @@ module RMAP (
                     rx_error_detect = 1'b1;
                     rx_error_code = 4'h7;
                 end else if (rx_valid_reg) begin
-                    if (rx_data_reg[7:0] == rx_crc_next) begin
+                    if (rx_data_reg[7:0] == rx_crc_reg) begin
                         case (rx_reg_command)
                             CMD_READ_SINGLE: next_state = RX_EOP_STATE; 
                             CMD_READ_INC: next_state = RX_EOP_STATE; 
@@ -558,7 +558,7 @@ module RMAP (
                     rx_error_detect = 1'b1;
                     rx_error_code = 4'h7;
                 end else if (rx_valid_reg) begin
-                    if (rx_data_reg[7:0] == rx_crc_next) begin
+                    if (rx_data_reg[7:0] == rx_crc_reg) begin
                         next_state = RX_EOP_STATE;
                     end else begin
                         next_state = RX_EOP_STATE;
@@ -848,7 +848,7 @@ module RMAP (
             if (no_reply_packet) no_reply_packet_reg <= 1;
             if (rx_error_detect && rx_error_code_reg == '0) rx_error_code_reg <= rx_error_code;
 
-            if (rx_valid_reg) rx_crc_reg <= rx_crc_next;
+            if (rx_crc_valid) rx_crc_reg <= rx_crc_next;
             if (tx_valid) tx_crc_reg <= tx_crc_next;
 
             case (state)
@@ -931,7 +931,7 @@ module RMAP (
                 end 
 
                 RX_HEADER_CRC: begin
-                    rx_crc_reg <= 8'h00;
+                    if (rx_valid_reg) rx_crc_reg <= 8'h00; //FIX: zera só quando byte chega mesmo
                 end
 
                 RX_DATA_STATE: begin
@@ -983,7 +983,7 @@ module RMAP (
                 TX_HEADER_CRC: begin
                     tx_crc_reg <= 8'h00;
                     if (tx_reg_command == CMD_READ_SINGLE || tx_reg_command == CMD_READ_INC) begin
-                            tx_reg_bank_r_addr = tx_reg_bank_r_addr + 1;
+                            tx_reg_bank_r_addr <= tx_reg_bank_r_addr + 1;
                     end else if  (tx_reg_command == CMD_READ_MODIFY_WRITE) begin
                         tx_cnt_data_byte <= '0; // Reseta o contador de bytes
                         tx_cnt_data <= '0;
