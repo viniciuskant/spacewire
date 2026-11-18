@@ -570,7 +570,9 @@ module RMAP (
 
             RX_EOP_STATE: begin // TODO incompleto, não esquever de verificar se de fato chega um EOP
                 if (rx_valid_reg) begin
-                    if (rx_error_code_reg == '0) begin
+                    if (no_reply_packet_reg) begin // FIX: pega CRC errado
+                        if (rx_data_reg == EOP_PACKET || rx_data_reg == EEP_PACKET) next_state = RX_IDLE;
+                    end else if (rx_error_code_reg == '0) begin
                         rx_error_code = 4'h0;
                         if (rx_data_reg == EOP_PACKET) begin
                             if (rx_src_path_valid_len == '0) next_state = TX_SRC_LOGICAL_ADDRESS;
@@ -849,7 +851,7 @@ module RMAP (
             if (rx_error_detect && rx_error_code_reg == '0) rx_error_code_reg <= rx_error_code;
 
             if (rx_crc_valid) rx_crc_reg <= rx_crc_next;
-            if (tx_valid) tx_crc_reg <= tx_crc_next;
+            if (tx_valid && state != TX_SRC_PATH_ADDRESS) tx_crc_reg <= tx_crc_next;//FIX: Tira reply address do CRC
 
             case (state)
                 RX_RST_STATE: begin
