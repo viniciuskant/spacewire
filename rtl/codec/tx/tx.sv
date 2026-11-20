@@ -42,7 +42,7 @@ module tx(
 
     wire tc_accept, tc_valid;
     wire [7:0] timecode;
-    tx_timecode_slot slot0 (
+    tx_timecode_slot u_slot (
     .i_sys_clk(i_sys_clk),
     .i_sys_rstn(i_sys_rstn),
     .i_link_run(i_link_run),
@@ -58,7 +58,7 @@ module tx(
     wire sel_nchar_accept, sel_nchar_valid;
     wire [8:0] sel_nchar_data;
 
-    tx_spill spill0 (
+    tx_spill u_spill (
         .i_sys_clk(i_sys_clk),
         .i_sys_rstn(i_sys_rstn),
         .i_left_run(i_left_run),
@@ -75,7 +75,7 @@ module tx(
     wire sys_wr_ready, sys_wr_valid;
     wire [2:0] sys_payload_type;
     wire [7:0] sys_payload;
-    tx_selector sel0 (
+    tx_selector u_sel (
         .i_link_connecting(i_link_connecting),
         .i_link_run(i_link_run),
         .i_fct_due(i_fct_due),
@@ -99,7 +99,7 @@ module tx(
     wire tx_ser_pop, tx_ser_valid, tx_enable_tx, tx_use_run_rate;
     wire [2:0] tx_ser_payload_type;
     wire [7:0] tx_ser_payload;
-    cdc_sys_tx cdc0 (
+    cdc_sys_tx u_cdc (
     .i_sys_clk(i_sys_clk),
     .i_sys_rstn(i_sys_rstn), // from reset_sync, system domain
     .i_sys_wr_valid(sys_wr_valid), // assert to write FIFO
@@ -122,7 +122,7 @@ module tx(
 
     // enable generator
     wire bit_en;
-    tx_enable_gen gen0 (
+    tx_enable_gen u_en_gen (
         .clk(i_tx_clk),
         .rst_n(i_tx_rstn),
         .tx_enable(tx_enable_tx),
@@ -132,7 +132,7 @@ module tx(
     );
 
     wire tx_ser_data_out, tx_ser_valid_out;
-    tx_serializer ser0 (
+    tx_serializer u_ser (
         .clk(i_tx_clk),
         .rst_n(i_tx_rstn),
         .bit_en(bit_en),
@@ -144,7 +144,7 @@ module tx(
         .data_out(tx_ser_data_out),
         .valid_out(tx_ser_valid_out)
     );
-    tx_ds_encoder enc0 (
+    tx_ds_encoder u_enc (
         .i_tx_clk(i_tx_clk),
         .i_tx_rstn(i_tx_rstn),
         .i_tx_enable(tx_enable_tx),

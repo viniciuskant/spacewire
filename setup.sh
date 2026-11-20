@@ -14,8 +14,8 @@ export FM_DIR="${TOOLS_DIR}/dc/fm"
 export VCS_DIR="${TOOLS_DIR}/dc/vcs"
 
 
-export PDK_MACRO=SAED90   # or SAED32, or SAED90, or IHP130, or NULL
-export TOP_MODULE_NAME="codec"
+export PDK_MACRO=IHP130   # or SAED32, or SAED90, or IHP130, or NULL
+export TOP_MODULE_NAME="spw_codec"
 
 ### MODULES
 MODULES=(

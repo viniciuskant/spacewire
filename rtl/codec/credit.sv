@@ -1,3 +1,6 @@
+`ifdef CREDIT_SV
+`endif
+
 import spw_pkg::*;
 
 // Credit counter for flow-control

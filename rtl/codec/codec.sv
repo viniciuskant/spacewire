@@ -69,7 +69,7 @@ module spw_codec #(
     wire [8:0] txbuf_rdata;
 
 
-    state_machine fsm (
+    state_machine u_fsm (
         .i_sys_clk(i_sys_clk),
         .i_sys_rstn(i_sys_rstn),
         .i_link_start(i_link_start),
@@ -98,7 +98,7 @@ module spw_codec #(
 
     credit #(
         .FIFO_DEPTH(RX_DEPTH)
-    ) credit0 (
+    ) u_credit (
         .i_sys_clk(i_sys_clk),
         .i_sys_rstn(i_sys_rstn),
         .i_rx_enable(fsm_rx_enable),
@@ -114,7 +114,7 @@ module spw_codec #(
         .o_credit_error(tx_credit_err)
     );
 
-    rx rx0 (
+    rx u_rx (
         .i_sys_clk(i_sys_clk),
         .i_sys_rstn(i_sys_rstn),
         .i_rx_enable(fsm_rx_enable),
@@ -144,7 +144,7 @@ module spw_codec #(
     fifo #(
         .ASIZE(RX_AW),
         .DSIZE(9)
-    ) rx_buf (
+    ) u_rx_buf (
         .i_clk(i_sys_clk),
         .i_rstn(i_sys_rstn),
         .i_wr(rxbuf_wr),
@@ -161,7 +161,7 @@ module spw_codec #(
     fifo #(
         .ASIZE(TX_AW),
         .DSIZE(9)
-    ) tx_buf (
+    ) u_tx_buf (
         .i_clk(i_sys_clk),
         .i_rstn(i_sys_rstn),
         .i_wr(i_tx_wr),
@@ -173,7 +173,7 @@ module spw_codec #(
         .o_count()
     );
 
-    tx tx0 (
+    tx u_tx (
         .i_tx_clk(i_tx_clk),
         .i_tx_rstn(i_tx_rstn),
         .i_sys_clk(i_sys_clk),

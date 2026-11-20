@@ -27,7 +27,7 @@ module cdc_sys_tx
 );
     logic fifo_full, fifo_empty;
     localparam int DSIZE = 11; // {type[2:0], payload[7:0]}
-    async_fifo #(DSIZE, ASIZE) fifo0 (
+    async_fifo #(DSIZE, ASIZE) u_fifo (
         .i_wclk(i_sys_clk),
         .i_wrst_n(i_sys_rstn),
         .i_wr(i_sys_wr_valid),
@@ -42,14 +42,14 @@ module cdc_sys_tx
     assign o_sys_wr_ready = !fifo_full;
     assign o_tx_rd_valid = !fifo_empty;
 
-    sync_2ff tx_enable_2ff (
+    sync_2ff u_tx_enable_2ff (
         .clk_dest(i_tx_clk),
         .rst_n(i_tx_rstn),
         .async_data(i_sys_tx_enable),
         .sync_data(o_tx_enable_tx)
     );
 
-    sync_2ff use_run_rate_2ff (
+    sync_2ff u_use_run_rate_2ff (
         .clk_dest(i_tx_clk),
         .rst_n(i_tx_rstn),
         .async_data(i_sys_use_run_rate),

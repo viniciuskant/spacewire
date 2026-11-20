@@ -45,7 +45,7 @@ end
 
 // ---- clock recovery and data capture ----
 wire rx_clk, rx_clk_n;
-rx_clk_rec clk_rec (
+rx_clk_rec u_clk_rec (
     .i_D(i_D),
     .i_S(i_S),
     .o_rx_clk(rx_clk),
@@ -53,7 +53,7 @@ rx_clk_rec clk_rec (
 );
 wire [1:0] dpair;
 wire dpair_valid;
-rx_ds_capture cap (
+rx_ds_capture u_cap (
     .i_rx_clk(rx_clk),
     .i_rx_rstn(rx_rstn),
     .i_D(i_D),

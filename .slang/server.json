@@ -1,8 +1,0 @@
-{
-  "flags": "--single-unit -I /home/ggsvr/.local/lib/uvm/src /home/ggsvr/.local/lib/uvm/src/uvm_pkg.sv -DUVM_NO_DPI",
-  "build": "sim/filelist.f",
-  "index": [{
-    "dirs": ["sim", "rtl", "/home/ggsvr/.local/lib/uvm/src"]
-
-  }]
-}
