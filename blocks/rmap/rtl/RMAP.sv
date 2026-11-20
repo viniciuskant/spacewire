@@ -430,14 +430,14 @@ module RMAP (
                     rx_error_detect = 1'b1;
                     rx_error_code = 4'h7;
                 end else if (rx_valid_reg && rx_cnt_target_addr == 2'b11) begin
-                    if ({rx_target_addr[23:0], rx_data_reg[7:0]} < REG_BASE_ADDR_32 || {rx_target_addr[23:0], rx_data_reg[7:0]} > REG_END_ADDR_32) begin
+                    if ((({rx_target_addr[23:0], rx_data_reg[7:0]}) >> 2) > REG_END_ADDR_32 || rx_data_reg[1:0] != 2'b00) begin // FIX: Padronizar endereços (reg = end/4)
                         next_state = RX_EOP_STATE;
                         rx_error_detect = 1'b1;
                         rx_error_code = 4'hA; //RMAP Command not implemented or not authorised
                     end else if ((rx_reg_command == CMD_WRITE || rx_reg_command == CMD_READ_MODIFY_WRITE) && 
-                            ({rx_target_addr[23:0], rx_data_reg[7:0]} == ADDR_NETWORK_DISCOVERY || 
-                            {rx_target_addr[23:0], rx_data_reg[7:0]} == ADDR_ROUTER_IDENTITY || 
-                            {rx_target_addr[23:0], rx_data_reg[7:0]} == ADDR_DEVICE_MANUFACTURER_ID)) begin // reg READ-ONLY
+                            ((({rx_target_addr[23:0], rx_data_reg[7:0]}) >> 2) == ADDR_NETWORK_DISCOVERY || 
+                            (({rx_target_addr[23:0], rx_data_reg[7:0]}) >> 2) == ADDR_ROUTER_IDENTITY || 
+                            (({rx_target_addr[23:0], rx_data_reg[7:0]}) >> 2) == ADDR_DEVICE_MANUFACTURER_ID)) begin // reg READ-ONLY
                         next_state = RX_EOP_STATE;
                         rx_error_detect = 1'b1;
                         rx_error_code = 4'hA; // RMAP Command not implemented or not authorised
@@ -454,7 +454,7 @@ module RMAP (
                 end else if (rx_valid_reg && (rx_data_reg == EEP_PACKET)) begin
                     rx_error_detect = 1'b1;
                     rx_error_code = 4'h7;
-                end else if (rx_cnt_data_len == 2'b10) begin
+                end else if (rx_valid_reg && rx_cnt_data_len == 2'b10) begin
                     case (rx_reg_command)
                         CMD_READ_SINGLE: begin
                             if ({rx_data_len[15:0], rx_data_reg[7:0]} == 24'h004) begin
@@ -529,7 +529,7 @@ module RMAP (
                 end else if (rx_valid_reg && (rx_data_reg == EEP_PACKET)) begin
                     rx_error_detect = 1'b1;
                     rx_error_code = 4'h7;
-                end else if (rx_cnt_data == 2'b11) begin
+                end else if (rx_valid_reg && rx_cnt_data == 2'b11) begin
                     case (rx_reg_command)
                         CMD_READ_MODIFY_WRITE: next_state = RX_MASK_STATE; 
                         CMD_WRITE: next_state = RX_DATA_CRC;
@@ -544,7 +544,7 @@ module RMAP (
                 end else if (rx_valid_reg && (rx_data_reg == EEP_PACKET)) begin
                     rx_error_detect = 1'b1;
                     rx_error_code = 4'h7;
-                end else if (rx_cnt_mask == 2'b11) begin
+                end else if (rx_valid_reg && rx_cnt_mask == 2'b11) begin
                     next_state = RX_DATA_CRC; 
                 end
             end
@@ -882,7 +882,7 @@ module RMAP (
                 end
 
                 RX_SRC_PATH_ADDRESS: begin
-                    if (rx_valid) begin
+                    if (rx_valid_reg) begin
                         if (|rx_data_reg) begin
                             rx_src_path_addr_nonzero_detected <= 1'b1;
                         end
@@ -901,32 +901,32 @@ module RMAP (
                 end 
 
                 RX_SRC_LOGICAL_ADDRESS: begin
-                    if (rx_valid) begin
+                    if (rx_valid_reg) begin
                         rx_reg_src_logical_addr <= rx_data_reg[7:0];
                     end
                 end
 
                 RX_TRANSACTION_ID_MS: begin
-                    if (rx_valid) begin 
+                    if (rx_valid_reg) begin 
                         rx_transaction_id[15:8] <= rx_data_reg[7:0];
                     end
                 end
 
                 RX_TRANSACTION_ID_LS: begin
-                    if (rx_valid) begin
+                    if (rx_valid_reg) begin
                         rx_transaction_id[7:0] <= rx_data_reg[7:0];
                     end
                 end
 
                 RX_TARGET_ADDRESS: begin
-                    if (rx_valid) begin
+                    if (rx_valid_reg) begin
                         rx_cnt_target_addr <= rx_cnt_target_addr + 1;
                         rx_target_addr <= {rx_target_addr[23:0], rx_data_reg[7:0]};
                     end
                 end 
 
                 RX_DATA_LENGTH: begin
-                    if (rx_valid) begin
+                    if (rx_valid_reg) begin
                         rx_cnt_data_len <= rx_cnt_data_len + 1;
                         rx_data_len <= {rx_data_len[15:0], rx_data_reg[7:0]};
                     end
@@ -937,14 +937,14 @@ module RMAP (
                 end
 
                 RX_DATA_STATE: begin
-                    if (rx_valid) begin
+                    if (rx_valid_reg) begin
                         rx_cnt_data <= rx_cnt_data + 1;
                         rx_data_write <= {rx_data_write[23:0], rx_data_reg[7:0]};
                     end
                 end
 
                 RX_MASK_STATE: begin
-                    if (rx_valid) begin
+                    if (rx_valid_reg) begin
                         rx_cnt_mask <= rx_cnt_mask + 1;
                         rx_mask_write <= {rx_mask_write[23:0], rx_data_reg[7:0]};
                     end

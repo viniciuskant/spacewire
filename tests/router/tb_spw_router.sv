@@ -29,7 +29,7 @@ module tb_spw_router;
     localparam logic [7:0] KEY       = 8'hAA;      // DESTINATION_KEY do reset do RMAP
     localparam logic [7:0] I_WRITE   = 8'h79;      // 01 1110 01: escrita, verify, reply, 4 bytes de reply address
     localparam logic [7:0] I_READ    = 8'h49;      // 01 0010 01: leitura simples, reply
-    localparam logic [31:0] A_GP     = 32'h0000_0106;  // GENERAL_PURPOSE
+    localparam logic [31:0] A_GP     = 32'h0000_0418;  // GENERAL_PURPOSE
     localparam logic [7:0] INIT_LA   = 8'h30;      // initiator logical address
 
     // portas físicas (índice 1..N)
