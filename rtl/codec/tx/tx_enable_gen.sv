@@ -17,6 +17,7 @@ module tx_enable_gen (
     // if low, the `clk_div` gets overwritten with the 10MHz rate
     input logic use_run_rate,
     // generated `enable`
+    // TODO: maybe register this
     output logic bit_en
 );
 // 200MHz / (19 + 1) = 10MHz
