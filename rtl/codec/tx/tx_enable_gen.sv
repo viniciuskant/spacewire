@@ -26,10 +26,19 @@ logic [6:0] counter;
 wire [6:0] div = use_run_rate ? clk_div : START_DIV;
 
 always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) counter <= START_DIV;
-    else if (!tx_enable) counter <= START_DIV;
-    else if (counter == 0) counter <= div;
-    else counter <= counter - 1;
+    if (!rst_n) begin
+        counter <= START_DIV;
+        bit_en <= 0;
+    end else if (!tx_enable) begin
+        counter <= START_DIV;
+        bit_en <= 0;
+    end else if (counter == 0) begin
+        counter <= div;
+        bit_en <= ~(|div);
+    end else begin
+        counter <= counter - 1;
+        bit_en  <= (counter == 7'd1);
+    end
 end
-assign bit_en = tx_enable && (counter == 0);
+// assign bit_en = tx_enable && (counter == 0);
 endmodule
