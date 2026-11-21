@@ -14,8 +14,34 @@ set_ungroup [get_cells u_rx/u_clk_rec] false
 
 create_clock -name clk_sys -period $T_SYS_CLK [get_ports $SYS_CLK_PORT]
 create_clock -name clk_tx -period $T_TX_CLK [get_ports $TX_CLK_PORT]
+
+# create_clock -name clk_rx -period $T_RX_CLK [get_pins $RX_CLK_PIN]
+# create_generated_clock -name clk_rx_n -source [get_pins $RX_CLK_PIN] -divide_by 1 -invert [get_pins $RX_CLK_N_PIN]
+
+# TODO revisar: tentativa de ajustar as constraints para que a STA entenda o caminho do clock reconstituído
 create_clock -name clk_rx -period $T_RX_CLK [get_pins $RX_CLK_PIN]
 create_generated_clock -name clk_rx_n -source [get_pins $RX_CLK_PIN] -divide_by 1 -invert [get_pins $RX_CLK_N_PIN]
+
+# TODO: Substituir este atraso estimado pelo atraso real de propagação
+# da célula XOR mapeada no PDK (EO2JIX0), considerando PVT, slew e carga.
+# Atualmente, a instância sintetizada ainda pode estar mapeada como GTECH_XOR2.
+#
+# Comandos úteis para:
+# get_cells -hierarchical *xor*
+# report_cell [get_cells u_rx/u_clk_rec/xor0]
+# grep -R -n -B 10 -A 5 'xor (' ixc013g2ng_stdcell/oa/ixc013g2ng_stdcell/
+# grep -R -l 'xor (Q, A, B);' ixc013g2ng_stdcell/oa/ixc013g2ng_stdcell/*/functional/verilog.v
+# célula: EO2JIX0
+# grep -n -A 200 'cell (EO2JIX0)' ixc013g2ng_stdcell/lib/ixc013g2ng_stdcell_slow_1p08V_125C.lib
+# index_1 -> Slew da entrada
+# index_2 -> Capacitância da saída
+
+set RX_XOR_DELAY 0.15
+
+set_clock_latency -late  $RX_XOR_DELAY [get_clocks clk_rx]
+set_clock_latency -early $RX_XOR_DELAY [get_clocks clk_rx]
+
+
 
 set_clock_uncertainty -setup 0.20 [all_clocks]
 set_clock_uncertainty -hold  0.05 [all_clocks]
@@ -122,3 +148,6 @@ set RX_JITTER   0.3
 set RX_UNC [expr {$RX_SKEW_EXT + $RX_JITTER}]
 set_clock_uncertainty -setup $RX_UNC [get_clocks {clk_rx clk_rx_n}]
 set_clock_uncertainty -hold  $RX_UNC [get_clocks {clk_rx clk_rx_n}]
+
+# Perguntas a se fazer:
+#   * o sinal d e s vão chegar diretamente da parte analógica, sem passar por um "lógica digital"?
