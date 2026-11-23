@@ -2,7 +2,7 @@
 +define+$PDK_MACRO
 
 // --- Testbench ---
-${TESTS_DIR}/tb_codec.sv
+${TESTS_DIR}/codec/tb_codec.sv
 
 // --- RTL Top ---
 ${RTL_DIR}/codec/codec.sv

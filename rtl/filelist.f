@@ -30,3 +30,10 @@ rtl/codec/error_cleanup_fsm.sv
 rtl/codec/state_machine.sv
 
 rtl/codec/codec.sv
+
+rtl/rmap/rmap_crc8.sv
+rtl/rmap/rmap_reg_bank.sv
+rtl/rmap/RMAP.sv
+rtl/rmap/coded_port_zero.sv
+
+rtl/top/spw_router.sv

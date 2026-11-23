@@ -178,7 +178,7 @@ module tb_spw_switch;
             $display("[PASS] %s: %s", name, got);
             n_pass++;
         end else begin
-            $display("[FAIL] %s: %s", name, got);
+            $error("[FAIL] %s: %s", name, got);
             n_fail++;
         end
     endtask
@@ -186,7 +186,7 @@ module tb_spw_switch;
     // O monitor coloca as palavras na sync_fifo, uma por ciclo.
     task push_rx(input int p, input logic [8:0] w);
         if (rx_t[p] >= DEPTH) begin
-            $display("[FAIL] tb: rx_fifo %0d estourou o buffer", p); n_fail++;
+            $error("[FAIL] tb: rx_fifo %0d estourou o buffer", p); n_fail++;
         end else begin
             rxm[p][rx_t[p]] = w;
             rx_t[p]++;
@@ -195,7 +195,7 @@ module tb_spw_switch;
 
     task push_exp(input int i, input int j, input logic [8:0] w);
         if (ex_t[i][j] >= DEPTH) begin
-            $display("[FAIL] tb: esperado %0d->%0d estourou o buffer", i, j); n_fail++;
+            $error("[FAIL] tb: esperado %0d->%0d estourou o buffer", i, j); n_fail++;
         end else begin
             expm[i][j][ex_t[i][j]] = w;
             ex_t[i][j]++;
@@ -693,8 +693,8 @@ module tb_spw_switch;
     initial begin
         #5000000;
         $display("RESUMO: %0d PASS, %0d FAIL (parou no timeout)", n_pass, n_fail);
-        $display("*** FAIL (timeout) ***");
-        $finish;
+        $error("Timeout global da simulacao");
+        $fatal(1);
     end
 
 endmodule

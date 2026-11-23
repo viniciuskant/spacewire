@@ -31,7 +31,7 @@ function cleanup {
 function run_flow_control_tx_test {
     echo "Executando teste flow_control_tx"
     verilator --top-module tb_flow_control_tx \
-        "${TESTS_DIR}/tb_flow_control_tx.sv" \
+        "${TESTS_DIR}/codec/tb_flow_control_tx.sv" \
         "${RTL_DIR}/codec/flow_control_tx.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_flow_control_tx
@@ -40,7 +40,7 @@ function run_flow_control_tx_test {
 function run_flow_control_rx_test {
     echo "Executando teste flow_control_rx"
     verilator --top-module tb_flow_control_rx \
-        "${TESTS_DIR}/tb_flow_control_rx.sv" \
+        "${TESTS_DIR}/codec/tb_flow_control_rx.sv" \
         "${RTL_DIR}/codec/flow_control_rx.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_flow_control_rx
@@ -49,7 +49,7 @@ function run_flow_control_rx_test {
 function run_rx_signal_test {
     echo "Executando teste rx_signal"
     verilator --top-module tb_rx_signal \
-        "${TESTS_DIR}/tb_rx_signal.sv" \
+        "${TESTS_DIR}/codec/tb_rx_signal.sv" \
         "${RTL_DIR}/codec/rx_signal.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_rx_signal
@@ -58,7 +58,7 @@ function run_rx_signal_test {
 function run_rx_char_test {
     echo "Executando teste rx_char"
     verilator --top-module tb_rx_char \
-        "${TESTS_DIR}/tb_rx_char.sv" \
+        "${TESTS_DIR}/codec/tb_rx_char.sv" \
         "${RTL_DIR}/codec/rx_char.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_rx_char
@@ -76,7 +76,7 @@ function run_rx_completo_test {
 function run_tx_signal_test {
     echo "Executando teste tx_signal"
     verilator --top-module tb_tx_signal \
-        "${TESTS_DIR}/tb_tx_signal.sv" \
+        "${TESTS_DIR}/codec/tb_tx_signal.sv" \
         "${RTL_DIR}/codec/tx_signal.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_tx_signal
@@ -85,7 +85,7 @@ function run_tx_signal_test {
 function run_codec_test {
     echo "Executando teste codec_"
     verilator --top-module tb_codec \
-        "${TESTS_DIR}/tb_codec.sv" \
+        "${TESTS_DIR}/codec/tb_codec.sv" \
         "${RTL_DIR}/codec/codec.sv" \
         "${RTL_DIR}/codec/var_clk_divider.sv" \
         "${RTL_DIR}/codec/error_cleanup_fsm.sv" \
@@ -116,13 +116,13 @@ function run_codec_test {
 function run_fifo_rx2fifo_test {
     echo "Executando teste async_fifo"
     verilator --top-module tb_fifo1 \
-        "${TESTS_DIR}/tb_fifo1.sv" \
-        "${RTL_DIR}/async_fifo/async_fifo.sv" \
-        "${RTL_DIR}/async_fifo/fifomem.sv" \
-        "${RTL_DIR}/async_fifo/rptr_empty.sv" \
-        "${RTL_DIR}/async_fifo/sync_r2w.sv" \
-        "${RTL_DIR}/async_fifo/sync_w2r.sv" \
-        "${RTL_DIR}/async_fifo/wptr_full.sv" \
+        "${TESTS_DIR}/fifos/tb_async_fifo.sv" \
+        "${RTL_DIR}/fifos/async_fifo.sv" \
+        "${RTL_DIR}/fifos/fifomem.sv" \
+        "${RTL_DIR}/fifos/rptr_empty.sv" \
+        "${RTL_DIR}/fifos/sync_r2w.sv" \
+        "${RTL_DIR}/fifos/sync_w2r.sv" \
+        "${RTL_DIR}/fifos/wptr_full.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_fifo1
 }
@@ -179,16 +179,54 @@ function run_spw_switch_test {
 function run_spw_router_test {
     echo "Executando teste spw_router"
     verilator --top-module tb_spw_router \
-        "${TESTS_DIR}/router/tb_spw_router.sv" \
+        "${TESTS_DIR}/top/tb_spw_router.sv" \
         "${RTL_DIR}"/top/*.sv \
         "${RTL_DIR}"/router/*.sv \
         "${RTL_DIR}"/fifos/*.sv \
-        "${SCRIPT_DIR}/blocks/rmap/rtl/RMAP.sv" \
-        "${SCRIPT_DIR}/blocks/rmap/rtl/rmap_crc8.sv" \
-        "${SCRIPT_DIR}/blocks/rmap/rtl/rmap_reg_bank.sv" \
-        "${SCRIPT_DIR}/blocks/rmap/rtl/coded_port_zero.sv" \
+        "${RTL_DIR}/rmap/RMAP.sv" \
+        "${RTL_DIR}/rmap/rmap_crc8.sv" \
+        "${RTL_DIR}/rmap/rmap_reg_bank.sv" \
+        "${RTL_DIR}/rmap/coded_port_zero.sv" \
         ${VERILATOR_FLAGS}
     ./obj_dir/Vtb_spw_router
+}
+
+function run_rmap_crc8_test {
+    echo "Executando teste rmap_crc8"
+    verilator --top-module tb_rmap_crc8 \
+        "${TESTS_DIR}/rmap/tb_rmap_crc8.sv" \
+        "${RTL_DIR}/rmap/rmap_crc8.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_rmap_crc8
+}
+
+function run_RMAP_test {
+    echo "Executando teste RMAP"
+    verilator --top-module tb_RMAP \
+        "${TESTS_DIR}/rmap/tb_RMAP.sv" \
+        "${RTL_DIR}/rmap/RMAP.sv" \
+        "${RTL_DIR}/rmap/rmap_crc8.sv" \
+        "${RTL_DIR}/rmap/rmap_reg_bank.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_RMAP
+}
+
+function run_coded_port_zero_test {
+    echo "Executando teste Port Zero"
+    verilator --top-module tb_coded_port_zero \
+        "${TESTS_DIR}/rmap/tb_coded_port_zero.sv" \
+        "${RTL_DIR}/rmap/coded_port_zero.sv" \
+        "${RTL_DIR}/fifos/sync_fifo.sv" \
+        "${RTL_DIR}/fifos/fifomem.sv" \
+        "${RTL_DIR}/fifos/rptr_empty.sv" \
+        "${RTL_DIR}/fifos/sync_r2w.sv" \
+        "${RTL_DIR}/fifos/sync_w2r.sv" \
+        "${RTL_DIR}/fifos/wptr_full.sv" \
+        "${RTL_DIR}/rmap/RMAP.sv" \
+        "${RTL_DIR}/rmap/rmap_crc8.sv" \
+        "${RTL_DIR}/rmap/rmap_reg_bank.sv" \
+        ${VERILATOR_FLAGS}
+    ./obj_dir/Vtb_coded_port_zero
 }
 
 
@@ -234,6 +272,15 @@ case "${nome_do_teste}" in
         ;;
     spw_router)
         run_spw_router_test
+        ;;
+    rmap_crc8)
+        run_rmap_crc8_test
+        ;;
+    RMAP)
+        run_RMAP_test
+        ;;
+    coded_port_zero)
+        run_coded_port_zero_test
         ;;
     all)
         run_flow_control_tx_test

@@ -98,7 +98,7 @@ module tb_spw_router;
             $display("[PASS] %s: %s", name, got);
             n_pass++;
         end else begin
-            $display("[FAIL] %s: %s", name, got);
+            $error("[FAIL] %s: %s", name, got);
             n_fail++;
         end
     endtask
@@ -451,8 +451,8 @@ module tb_spw_router;
     initial begin
         #5000000;
         $display("RESUMO: %0d PASS, %0d FAIL (parou no timeout)", n_pass, n_fail);
-        $display("*** FAIL (timeout) ***");
-        $finish;
+        $error("Timeout global da simulacao");
+        $fatal(1);
     end
 
 endmodule
