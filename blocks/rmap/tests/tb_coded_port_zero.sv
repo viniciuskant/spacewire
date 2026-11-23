@@ -174,6 +174,7 @@ module tb_coded_port_zero;
             b = value[15:8]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
             b = value[7:0]; send_byte({1'b0, b}); data_crc = calc_crc8(data_crc, b);
             b = data_crc; send_byte({1'b0, b});
+            send_byte(9'h102); // EOP
 
             wait_reply("WRITE");
 
@@ -197,6 +198,7 @@ module tb_coded_port_zero;
             $display("\n=== %s addr=0x%08h dlen=%0d tid=0x%04h ===",
                      name, addr, dlen, tid);
             send_header(instr, tid, addr, dlen, 8'hAA);
+            send_byte(9'h102); //EOP
             wait_reply(name);
             if (reply_count > 3) begin
                 if (reply_buf[3] !== 8'h00)

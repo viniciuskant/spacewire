@@ -226,13 +226,12 @@ module tb_RMAP;
             send_byte({1'b0, b});
             header_crc = calc_crc8(header_crc, b);
 
-            if (type_erro == RMAP_ERR_EARLY_EEP) send_byte({1'b1, 8'h01}); // EEP
-
             b = header_crc;
             if (type_erro == RMAP_ERR_INVALID_HEADER_CRC) b = ~header_crc; // Injeta erro (CRC invertido)
             send_byte({1'b0, b});
 
             if (type_erro == RMAP_ERR_EARLY_EOP) send_byte({1'b1, 8'h02});
+            if (type_erro == RMAP_ERR_EARLY_EEP) send_byte({1'b1, 8'h01}); // EEP logo depois do CRC do cabeçalho
             
         end
     endtask
@@ -348,22 +347,22 @@ module tb_RMAP;
             for (int i = 0;i < source_path_len;i++) begin
                 b = source_path_base_reply + (4*i) + 0;
                 if (reply_buf[idx] !== b) $error("Erro no Byte %0d. Esp: 0x%02h, Obt: 0x%02h", idx, b, reply_buf[idx]);
-                expected_crc = calc_crc8(expected_crc, b);
+                //expected_crc = calc_crc8(expected_crc, b);
                 idx = idx + 1;
 
                 b = source_path_base_reply + (4*i) + 1;
                 if (reply_buf[idx] !== b) $error("Erro no Byte %0d. Esp: 0x%02h, Obt: 0x%02h", idx, b, reply_buf[idx]);
-                expected_crc = calc_crc8(expected_crc, b);
+                //expected_crc = calc_crc8(expected_crc, b);
                 idx = idx + 1;
 
                 b = source_path_base_reply + (4*i) + 2;
                 if (reply_buf[idx] !== b) $error("Erro no Byte %0d. Esp: 0x%02h, Obt: 0x%02h", idx, b, reply_buf[idx]);
-                expected_crc = calc_crc8(expected_crc, b);
+                //expected_crc = calc_crc8(expected_crc, b);
                 idx = idx + 1;
 
                 b = source_path_base_reply + (4*i) + 3;
                 if (reply_buf[idx] !== b) $error("Erro no Byte %0d. Esp: 0x%02h, Obt: 0x%02h", idx, b, reply_buf[idx]);
-                expected_crc = calc_crc8(expected_crc, b);
+                //expected_crc = calc_crc8(expected_crc, b);
                 idx = idx + 1;
             end
 
@@ -498,22 +497,22 @@ module tb_RMAP;
             for (int i = 0;i < source_path_len;i++) begin
                 b = source_path_base_reply + (4*i) + 0;
                 if (reply_buf[idx] !== b) $error("Erro no Byte %0d. Esp: 0x%02h, Obt: 0x%02h", idx, b, reply_buf[idx]);
-                expected_crc = calc_crc8(expected_crc, b);
+                //expected_crc = calc_crc8(expected_crc, b);
                 idx = idx + 1;
 
                 b = source_path_base_reply + (4*i) + 1;
                 if (reply_buf[idx] !== b) $error("Erro no Byte %0d. Esp: 0x%02h, Obt: 0x%02h", idx, b, reply_buf[idx]);
-                expected_crc = calc_crc8(expected_crc, b);
+                //expected_crc = calc_crc8(expected_crc, b);
                 idx = idx + 1;
 
                 b = source_path_base_reply + (4*i) + 2;
                 if (reply_buf[idx] !== b) $error("Erro no Byte %0d. Esp: 0x%02h, Obt: 0x%02h", idx, b, reply_buf[idx]);
-                expected_crc = calc_crc8(expected_crc, b);
+                //expected_crc = calc_crc8(expected_crc, b);
                 idx = idx + 1;
 
                 b = source_path_base_reply + (4*i) + 3;
                 if (reply_buf[idx] !== b) $error("Erro no Byte %0d. Esp: 0x%02h, Obt: 0x%02h", idx, b, reply_buf[idx]);
-                expected_crc = calc_crc8(expected_crc, b);
+                //expected_crc = calc_crc8(expected_crc, b);
                 idx = idx + 1;
             end
 
@@ -698,22 +697,22 @@ module tb_RMAP;
             for (int i = 0;i < source_path_len;i++) begin
                 b = source_path_base_reply + (4*i) + 0;
                 if (reply_buf[idx] !== b) $error("Erro no Byte %0d. Esp: 0x%02h, Obt: 0x%02h", idx, b, reply_buf[idx]);
-                expected_crc = calc_crc8(expected_crc, b);
+                //expected_crc = calc_crc8(expected_crc, b);
                 idx = idx + 1;
 
                 b = source_path_base_reply + (4*i) + 1;
                 if (reply_buf[idx] !== b) $error("Erro no Byte %0d. Esp: 0x%02h, Obt: 0x%02h", idx, b, reply_buf[idx]);
-                expected_crc = calc_crc8(expected_crc, b);
+                //expected_crc = calc_crc8(expected_crc, b);
                 idx = idx + 1;
 
                 b = source_path_base_reply + (4*i) + 2;
                 if (reply_buf[idx] !== b) $error("Erro no Byte %0d. Esp: 0x%02h, Obt: 0x%02h", idx, b, reply_buf[idx]);
-                expected_crc = calc_crc8(expected_crc, b);
+                //expected_crc = calc_crc8(expected_crc, b);
                 idx = idx + 1;
 
                 b = source_path_base_reply + (4*i) + 3;
                 if (reply_buf[idx] !== b) $error("Erro no Byte %0d. Esp: 0x%02h, Obt: 0x%02h", idx, b, reply_buf[idx]);
-                expected_crc = calc_crc8(expected_crc, b);
+                //expected_crc = calc_crc8(expected_crc, b);
                 idx = idx + 1;
             end
 

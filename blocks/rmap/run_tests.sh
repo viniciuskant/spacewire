@@ -63,7 +63,7 @@ function run_coded_port_zero_test {
         "${RTL_DIR}/rmap_crc8.sv" \
         "${RTL_DIR}/rmap_reg_bank.sv" \
         ${VERILATOR_FLAGS}
-    ./obj_dir/Vtb_RMAP
+    ./obj_dir/Vtb_coded_port_zero
 }
 
 
