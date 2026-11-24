@@ -1,0 +1,25 @@
+# -----------------------------------------------------------------------------
+# Design Compiler setup -- read automatically by dc_shell when started in syn/
+# -----------------------------------------------------------------------------
+# EDIT: point SAED90_ROOT at your SAED 90 nm kit, and check the .db names in
+# its synopsys model directory (they differ between kit releases).
+
+set SAED90_ROOT  /path/to/SAED_EDK90nm
+set LIB_DB_DIR   $SAED90_ROOT/Digital_Standard_cell_Library/synopsys/models
+
+# Worst-case (slow) corner for setup. Add the fast corner later for hold
+# analysis (e.g. with set_min_library) once the flow runs.
+set LIB_WORST    saed90nm_max.db
+
+set_app_var search_path    [list . $LIB_DB_DIR]
+set_app_var target_library [list $LIB_WORST]
+set_app_var link_library   [concat * $LIB_WORST]
+
+# Keep elaborated designs out of the source tree
+define_design_lib WORK -path ./work
+
+# Readable names for registers (used by the CDC constraints: *_reg)
+set_app_var hdlin_infer_multibit default_none
+
+# Report clock-gating cells by their library function
+set_app_var power_cg_auto_identify true

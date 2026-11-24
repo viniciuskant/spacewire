@@ -23,11 +23,9 @@ ${RTL_DIR}/codec/tx_signal.sv
 ${RTL_DIR}/codec/cdc_sync.sv
 ${RTL_DIR}/codec/spw_char_decode.sv
 
-// --- Async FIFO ---
-${RTL_DIR}/fifos/async_fifo.sv
-${RTL_DIR}/fifos/sync_fifo.sv
-${RTL_DIR}/fifos/fifomem.sv
-${RTL_DIR}/fifos/rptr_empty.sv
-${RTL_DIR}/fifos/sync_r2w.sv
-${RTL_DIR}/fifos/sync_w2r.sv
-${RTL_DIR}/fifos/wptr_full.sv
+// --- FIFOs e sincronizadores (rtl/common) ---
+${RTL_DIR}/common/async_fifo.sv
+${RTL_DIR}/common/sync_2ff.sv
+${RTL_DIR}/common/sync_gray_counter.sv
+${RTL_DIR}/common/fifo.sv
+${RTL_DIR}/common/reset_sync.sv

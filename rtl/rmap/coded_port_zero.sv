@@ -29,14 +29,13 @@ module coded_port_zero #(
     logic rx_fifo_rinc;
     logic [DATA_WIDTH_FIFO-1:0] rx_fifo_rdata;
     logic rx_fifo_rempty;
-    logic [FIFO_ASIZE:0] rx_fifo_free_space;
+    logic rx_fifo_full;
 
     logic [DATA_WIDTH_FIFO-1:0] tx_fifo_wdata;
     logic tx_fifo_winc;
     logic tx_fifo_rinc;
     logic [DATA_WIDTH_FIFO-1:0] tx_fifo_rdata;
     logic tx_fifo_rempty;
-    logic [FIFO_ASIZE:0] tx_fifo_free_space;
     logic tx_fifo_full;
 
     logic [8:0] rmap_rx_data;
@@ -49,15 +48,13 @@ module coded_port_zero #(
 
     assign rx_fifo_wdata = spw_rx_data;
     assign rx_fifo_winc  = spw_rx_valid & spw_rx_ready;
-    assign spw_rx_ready  = (rx_fifo_free_space != '0);
+    assign spw_rx_ready  = ~rx_fifo_full;
 
     // consome o FIFO sempre que houver dado disponível e não oculpado
     assign rmap_rx_valid = ~rx_fifo_rempty & ~busy;
     assign rmap_rx_data = rx_fifo_rdata;
     assign rx_fifo_rinc = ~rx_fifo_rempty & ~busy;
 
-
-    assign tx_fifo_full = (tx_fifo_free_space == '0);
 
     assign tx_fifo_wdata = rmap_tx_data;
     assign tx_fifo_winc = rmap_tx_valid & ~tx_fifo_full;
@@ -88,36 +85,38 @@ module coded_port_zero #(
         .busy (busy)
     );
 
-    sync_fifo #(
+    fifo #(
         .DSIZE (DATA_WIDTH_FIFO),
         .ASIZE (FIFO_ASIZE)
     ) u_rx_fifo (
-        .clk (clk),
-        .rst_n (rst_n),
+        .i_clk (clk),
+        .i_rstn (rst_n),
 
-        .wdata (rx_fifo_wdata),
-        .winc (rx_fifo_winc),
+        .i_wdata (rx_fifo_wdata),
+        .i_wr (rx_fifo_winc),
 
-        .rinc (rx_fifo_rinc),
-        .rdata (rx_fifo_rdata),
-        .rempty (rx_fifo_rempty),
-        .free_space_o (rx_fifo_free_space)
+        .i_rd (rx_fifo_rinc),
+        .o_rdata (rx_fifo_rdata),
+        .o_empty (rx_fifo_rempty),
+        .o_full (rx_fifo_full),
+        .o_count ()
     );
 
-    sync_fifo #(
+    fifo #(
         .DSIZE (DATA_WIDTH_FIFO),
         .ASIZE (FIFO_ASIZE)
     ) u_tx_fifo (
-        .clk (clk),
-        .rst_n (rst_n),
+        .i_clk (clk),
+        .i_rstn (rst_n),
 
-        .wdata (tx_fifo_wdata),
-        .winc (tx_fifo_winc),
+        .i_wdata (tx_fifo_wdata),
+        .i_wr (tx_fifo_winc),
 
-        .rinc (tx_fifo_rinc),
-        .rdata (tx_fifo_rdata),
-        .rempty (tx_fifo_rempty),
-        .free_space_o (tx_fifo_free_space)
+        .i_rd (tx_fifo_rinc),
+        .o_rdata (tx_fifo_rdata),
+        .o_empty (tx_fifo_rempty),
+        .o_full (tx_fifo_full),
+        .o_count ()
     );
 
 endmodule

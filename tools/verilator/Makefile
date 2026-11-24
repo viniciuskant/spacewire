@@ -7,7 +7,8 @@ SIM_ROOT:=$(PROJ_ROOT)/sim
 UVM_HOME?=$(HOME)/.local/lib/uvm/src
 SEED?=1
 UVM_VERBOSITY?=UVM_LOW
-VL_ARGS:=--binary --timing -j 0 -Wno-fatal -Wno-lint -Wno-style --timescale 1ns/1ps \
+# --assert: check the RTL's SVA assertions too
+VL_ARGS:=--binary --timing --assert -j 0 -Wno-fatal -Wno-lint -Wno-style --timescale 1ns/1ps \
 	+define+UVM_NO_DPI +incdir+$(UVM_HOME) $(UVM_HOME)/uvm_pkg.sv
 SIM_ARGS:=+verilator+seed+$(SEED) +UVM_VERBOSITY=$(UVM_VERBOSITY) +UVM_NO_RELNOTES
 

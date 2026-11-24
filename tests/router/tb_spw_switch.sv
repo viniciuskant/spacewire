@@ -18,9 +18,10 @@ module tb_spw_switch;
         forever #2.5 rclk = ~rclk;   // 200 MHz (como clk_ref_tx do codec)
     end
 
-    localparam int RX_ASIZE = 6;             // sync_fifo: 64 palavras (DEPTH_FIFO do codec)
-    localparam int RX_DEPTH = 1 << RX_ASIZE;
-    localparam int TX_ASIZE = 4;             // async_fifo: 16 palavras (sync_r2w/sync_w2r só têm ADDRSIZE = 4)
+    localparam logic [8:0] EOP = spw_pkg::CONST_EOP;   // 9'h100
+    localparam logic [8:0] EEP = spw_pkg::CONST_EEP;   // 9'h101
+    localparam int RX_ASIZE = 6;             // fifo: 64 palavras (DEPTH_FIFO do codec)
+    localparam int TX_ASIZE = 4;             // async_fifo: 16 palavras
 
     // DUT com N = 4
     localparam int N4    = 4;
@@ -31,11 +32,12 @@ module tb_spw_switch;
     logic [N4:0][8:0]     in_data4;
     logic [N4:0]          in_empty4, rd4;
     logic [N4:0][8:0]     out_data4;
-    logic [N4:0]          full4;                  // wfull da async_fifo
+    logic [N4:0]          full4;                  // o_wfull da async_fifo
     logic [N4:0]          wr4;
-    logic [N4:0]          rx_winc4 = '0;          // escrita na sync_fifo
+    logic [N4:0]          rx_winc4 = '0;          // escrita na fifo
     logic [N4:0][8:0]     rx_wdata4 = '0;
-    logic [N4:0][RX_ASIZE:0] rx_free4;            // free_space_o da sync_fifo
+    logic [N4:0][RX_ASIZE:0] rx_cnt4;             // o_count da fifo (palavras dentro)
+    logic [N4:0]          rx_full4;               // o_full da fifo
     logic [N4:0]          tx_rinc4 = '0;          // leitura da async_fifo
     logic [N4:0]          tx_empty4;
     logic [N4:0][8:0]     tx_rdata4;
@@ -78,18 +80,18 @@ module tb_spw_switch;
         assign m_dest[p]   = dut4.ic_dest[p];
         assign m_gnt[p]    = dut4.arb_gnt[p];
 
-        sync_fifo #(.DSIZE(9), .ASIZE(RX_ASIZE)) u_rx (
-            .clk(clk), .rst_n(rst_n),
-            .winc(rx_winc4[p]), .wdata(rx_wdata4[p]),
-            .rinc(rd4[p]), .rdata(in_data4[p]), .rempty(in_empty4[p]),
-            .free_space_o(rx_free4[p])
+        fifo #(.DSIZE(9), .ASIZE(RX_ASIZE)) u_rx (
+            .i_clk(clk), .i_rstn(rst_n),
+            .i_wr(rx_winc4[p]), .i_wdata(rx_wdata4[p]),
+            .i_rd(rd4[p]), .o_rdata(in_data4[p]), .o_empty(in_empty4[p]),
+            .o_full(rx_full4[p]), .o_count(rx_cnt4[p])
         );
 
         async_fifo #(.DSIZE(9), .ASIZE(TX_ASIZE)) u_tx (
-            .wclk(clk), .wrst_n(rst_n),
-            .winc(wr4[p]), .wdata(out_data4[p]), .wfull(full4[p]),
-            .rclk(rclk), .rrst_n(rst_n),
-            .rinc(tx_rinc4[p]), .rdata(tx_rdata4[p]), .rempty(tx_empty4[p])
+            .i_wclk(clk), .i_wrst_n(rst_n),
+            .i_wr(wr4[p]), .i_wdata(out_data4[p]), .o_wfull(full4[p]),
+            .i_rclk(rclk), .i_rrst_n(rst_n),
+            .i_rd(tx_rinc4[p]), .o_rdata(tx_rdata4[p]), .o_rempty(tx_empty4[p])
         );
     end
 
@@ -114,7 +116,8 @@ module tb_spw_switch;
     logic [N8:0]          err8, busy8;
     logic [7:0]           tc_tx8;
     logic [5:0]           tc_reg8;
-    logic [N8:0][RX_ASIZE:0] rx8_free;            // portas sem dados: nunca enche
+    logic [N8:0][RX_ASIZE:0] rx8_cnt;
+    logic [N8:0]          rx8_full;               // portas sem dados: nunca enche
     // verilator lint_on UNUSEDSIGNAL
 
     spw_switch #(.N_PORTS(N8)) dut8 (
@@ -132,23 +135,23 @@ module tb_spw_switch;
     );
 
     for (genvar p = 0; p <= N8; p++) begin : g_view8
-        sync_fifo #(.DSIZE(9), .ASIZE(RX_ASIZE)) u_rx (
-            .clk(clk), .rst_n(rst_n),
-            .winc((p == 1) ? rx8_winc : 1'b0), .wdata(rx8_wdata),
-            .rinc(rd8[p]), .rdata(in_data8[p]), .rempty(in_empty8[p]),
-            .free_space_o(rx8_free[p])
+        fifo #(.DSIZE(9), .ASIZE(RX_ASIZE)) u_rx (
+            .i_clk(clk), .i_rstn(rst_n),
+            .i_wr((p == 1) ? rx8_winc : 1'b0), .i_wdata(rx8_wdata),
+            .i_rd(rd8[p]), .o_rdata(in_data8[p]), .o_empty(in_empty8[p]),
+            .o_full(rx8_full[p]), .o_count(rx8_cnt[p])
         );
 
         async_fifo #(.DSIZE(9), .ASIZE(TX_ASIZE)) u_tx (
-            .wclk(clk), .wrst_n(rst_n),
-            .winc(wr8[p]), .wdata(out_data8[p]), .wfull(full8[p]),
-            .rclk(rclk), .rrst_n(rst_n),
-            .rinc(tx8_rinc[p]), .rdata(tx8_rdata[p]), .rempty(tx8_empty[p])
+            .i_wclk(clk), .i_wrst_n(rst_n),
+            .i_wr(wr8[p]), .i_wdata(out_data8[p]), .o_wfull(full8[p]),
+            .i_rclk(rclk), .i_rrst_n(rst_n),
+            .i_rd(tx8_rinc[p]), .o_rdata(tx8_rdata[p]), .o_rempty(tx8_empty[p])
         );
     end
 
     // Estímulo e scoreboard
-    // palavras que ainda vão entrar na sync_fifo de p: rxm[p][rx_h..rx_t-1]
+    // palavras que ainda vão entrar na fifo de p: rxm[p][rx_h..rx_t-1]
     logic [8:0] rxm  [0:N4][0:DEPTH-1];
     int         rx_h [0:N4];
     int         rx_t [0:N4];
@@ -183,7 +186,7 @@ module tb_spw_switch;
         end
     endtask
 
-    // O monitor coloca as palavras na sync_fifo, uma por ciclo.
+    // O monitor coloca as palavras na fifo, uma por ciclo.
     task push_rx(input int p, input logic [8:0] w);
         if (rx_t[p] >= DEPTH) begin
             $error("[FAIL] tb: rx_fifo %0d estourou o buffer", p); n_fail++;
@@ -204,7 +207,7 @@ module tb_spw_switch;
 
     // Pacote de i para j. Caminho: cabeçalho = j
     // Lógico: cabeçalho = 50 + j (tabela 51..54 para 1..4, mantido na saída).
-    // mk = marcador final (102 = EOP, 101 = EEP); exp = 0 não registra o esperado.
+    // mk = marcador final (EOP ou EEP); exp = 0 não registra o esperado.
     logic [8:0] last_body [0:31];           // bytes do último pacote enviado
     task send_pkt(input int i, input int j, input logic logical, input int nbytes,
                   input logic [8:0] mk, input logic exp);
@@ -225,9 +228,9 @@ module tb_spw_switch;
     function automatic int rx_left();
         int s;
         s = 0;
-        // a entrar + em trânsito + dentro da sync_fifo
+        // a entrar + em trânsito + dentro da fifo
         for (int p = 0; p <= N4; p++)
-            s += (rx_t[p] - rx_h[p]) + int'(rx_winc4[p]) + (RX_DEPTH - int'(rx_free4[p]));
+            s += (rx_t[p] - rx_h[p]) + int'(rx_winc4[p]) + int'(rx_cnt4[p]);
         return s;
     endfunction
 
@@ -377,14 +380,14 @@ module tb_spw_switch;
         #0.5;
         for (int p = 0; p <= N4; p++) begin
             rx_winc4[p] = 1'b0;
-            if (rx_h[p] != rx_t[p] && rx_free4[p] != '0) begin   // não escreve com a rx_fifo cheia
+            if (rx_h[p] != rx_t[p] && !rx_full4[p]) begin   // não escreve com a rx_fifo cheia
                 rx_winc4[p]  = 1'b1;
                 rx_wdata4[p] = rxm[p][rx_h[p]];
                 rx_h[p]++;
             end
         end
         rx8_winc = 1'b0;
-        if (rx8_h != rx8_t && rx8_free[1] != '0) begin
+        if (rx8_h != rx8_t && !rx8_full[1]) begin
             rx8_winc  = 1'b1;
             rx8_wdata = rx8m[rx8_h];
             rx8_h++;
@@ -439,27 +442,27 @@ module tb_spw_switch;
         prog8(8'd100, 4'd5);                                 // N = 8: lógico 100 para 5
 
         // 1. Caminho 1 para 3
-        push_rx(1, 9'h003); push_rx(1, 9'h0A5); push_rx(1, 9'h03C); push_rx(1, 9'h102);
-        push_exp(1, 3, 9'h0A5); push_exp(1, 3, 9'h03C); push_exp(1, 3, 9'h102);
+        push_rx(1, 9'h003); push_rx(1, 9'h0A5); push_rx(1, 9'h03C); push_rx(1, EOP);
+        push_exp(1, 3, 9'h0A5); push_exp(1, 3, 9'h03C); push_exp(1, 3, EOP);
         drain("T1", 200);
         sb_check("T1 caminho 1 -> 3 sem cabeçalho");
 
         // 2. Lógico 44 para 2
-        push_rx(1, 9'h02C); push_rx(1, 9'h011); push_rx(1, 9'h022); push_rx(1, 9'h102);
-        push_exp(1, 2, 9'h02C); push_exp(1, 2, 9'h011); push_exp(1, 2, 9'h022); push_exp(1, 2, 9'h102);
+        push_rx(1, 9'h02C); push_rx(1, 9'h011); push_rx(1, 9'h022); push_rx(1, EOP);
+        push_exp(1, 2, 9'h02C); push_exp(1, 2, 9'h011); push_exp(1, 2, 9'h022); push_exp(1, 2, EOP);
         drain("T2", 200);
         sb_check("T2 lógico 44 -> 2 com cabeçalho");
 
         // 3. Duas entradas para a mesma saída
-        send_pkt(1, 2, 1'b0, 8, 9'h102, 1'b1);
-        send_pkt(3, 2, 1'b0, 8, 9'h102, 1'b1);
+        send_pkt(1, 2, 1'b0, 8, EOP, 1'b1);
+        send_pkt(3, 2, 1'b0, 8, EOP, 1'b1);
         drain("T3", 200);
         sb_check("T3 1 -> 2 e 3 -> 2: inteiros, sem misturar");
 
         // 4. Paralelo: 1 para 2 e 3 para 4
         p0 = par24;
-        send_pkt(1, 2, 1'b0, 8, 9'h102, 1'b1);
-        send_pkt(3, 4, 1'b0, 8, 9'h102, 1'b1);
+        send_pkt(1, 2, 1'b0, 8, EOP, 1'b1);
+        send_pkt(3, 4, 1'b0, 8, EOP, 1'b1);
         drain("T4", 200);
         sb_check("T4 1 -> 2 e 3 -> 4");
         pass_fail("T4 gravações nos mesmos ciclos", (par24 - p0) >= 8,
@@ -467,10 +470,10 @@ module tb_spw_switch;
 
         // 5. Permutação completa
         a0 = all4;
-        send_pkt(1, 2, 1'b0, 6, 9'h102, 1'b1);
-        send_pkt(2, 3, 1'b1, 6, 9'h102, 1'b1);
-        send_pkt(3, 4, 1'b0, 6, 9'h102, 1'b1);
-        send_pkt(4, 1, 1'b1, 6, 9'h102, 1'b1);
+        send_pkt(1, 2, 1'b0, 6, EOP, 1'b1);
+        send_pkt(2, 3, 1'b1, 6, EOP, 1'b1);
+        send_pkt(3, 4, 1'b0, 6, EOP, 1'b1);
+        send_pkt(4, 1, 1'b1, 6, EOP, 1'b1);
         drain("T5", 200);
         sb_check("T5 permutação 1->2, 2->3, 3->4, 4->1");
         pass_fail("T5 as 4 saídas gravando no mesmo ciclo", (all4 - a0) > 0,
@@ -478,8 +481,8 @@ module tb_spw_switch;
 
         // 6. Cabeçalho inválido na porta 2 (caminho 5 > N)
         e0 = err_cnt[2];
-        push_rx(2, 9'h005); push_rx(2, 9'h0EE); push_rx(2, 9'h0EF); push_rx(2, 9'h102);
-        send_pkt(2, 3, 1'b0, 4, 9'h102, 1'b1);
+        push_rx(2, 9'h005); push_rx(2, 9'h0EE); push_rx(2, 9'h0EF); push_rx(2, EOP);
+        send_pkt(2, 3, 1'b0, 4, EOP, 1'b1);
         drain("T6", 200);
         sb_check("T6 só o pacote válido sai");
         pass_fail("T6 err_route[2] pulsou 1 vez", (err_cnt[2] - e0) == 1,
@@ -487,7 +490,7 @@ module tb_spw_switch;
 
         // 7. Saída cheia no meio do pacote: para de ler a tx_fifo 3 até a wfull subir
         rd_stop[3] = 1'b1;
-        send_pkt(1, 3, 1'b0, 24, 9'h102, 1'b1);              // 25 palavras > 16 da tx_fifo
+        send_pkt(1, 3, 1'b0, 24, EOP, 1'b1);              // 25 palavras > 16 da tx_fifo
         for (int c = 0; c < 200 && !full4[3]; c++) tick();
         ok = full4[3];
         repeat (2) tick();
@@ -502,11 +505,11 @@ module tb_spw_switch;
 
         // 8. Link de destino cai no meio do pacote (1 para 2)
         e0 = err_cnt[1];
-        send_pkt(1, 2, 1'b0, 10, 9'h102, 1'b0);
+        send_pkt(1, 2, 1'b0, 10, EOP, 1'b0);
         while (cap_cnt(2) < 3) tick();                         // 3 bytes gravados
         run4 = 4'b1101;
         for (int k = 0; k < 3; k++) push_exp(1, 2, last_body[k]);
-        push_exp(1, 2, 9'h101);
+        push_exp(1, 2, EEP);
         drain("T8", 200);
         run4 = '1;
         sb_check("T8 bytes enviados + EEP");
@@ -531,7 +534,7 @@ module tb_spw_switch;
         for (int n = 0; n < 200; n++) begin
             dj = $urandom_range(N4 - 1) + 1;
             send_pkt((n % N4) + 1, dj, 1'($urandom_range(1)), $urandom_range(20),
-                     ($urandom_range(9) == 0) ? 9'h101 : 9'h102, 1'b1);
+                     ($urandom_range(9) == 0) ? EEP : EOP, 1'b1);
         end
         drain("T10", 50000);
         stress = 1'b0;
@@ -543,15 +546,15 @@ module tb_spw_switch;
         pass_fail("T10 tx_fifo cheia durante o estresse", full_cyc > 0, $sformatf("%0d ciclos com wfull", full_cyc));
 
         // 11. N = 8: caminho 8 e lógico 100 para 5, entrando pela porta 1
-        rx8m[0] = 9'h008; rx8m[1] = 9'h0AA; rx8m[2] = 9'h0BB; rx8m[3] = 9'h102;
-        rx8m[4] = 9'h064; rx8m[5] = 9'h0CC; rx8m[6] = 9'h102;
+        rx8m[0] = 9'h008; rx8m[1] = 9'h0AA; rx8m[2] = 9'h0BB; rx8m[3] = EOP;
+        rx8m[4] = 9'h064; rx8m[5] = 9'h0CC; rx8m[6] = EOP;
         rx8_t = 7;
         for (int c = 0; c < 100 && (rx8_h != rx8_t || rx8_winc || !in_empty8[1]); c++) tick();
         repeat (5) tick();
-        ok = cp8_t[8] == 3 && cap8m[8][0] == 9'h0AA && cap8m[8][1] == 9'h0BB && cap8m[8][2] == 9'h102;
+        ok = cp8_t[8] == 3 && cap8m[8][0] == 9'h0AA && cap8m[8][1] == 9'h0BB && cap8m[8][2] == EOP;
         pass_fail("T11 N=8 caminho 8", ok,
                   $sformatf("saída 8: %0d palavras [%03h %03h %03h]", cp8_t[8], cap8m[8][0], cap8m[8][1], cap8m[8][2]));
-        ok = cp8_t[5] == 3 && cap8m[5][0] == 9'h064 && cap8m[5][1] == 9'h0CC && cap8m[5][2] == 9'h102;
+        ok = cp8_t[5] == 3 && cap8m[5][0] == 9'h064 && cap8m[5][1] == 9'h0CC && cap8m[5][2] == EOP;
         nb = 0;
         for (int j = 0; j <= N8; j++) nb += cp8_t[j];
         pass_fail("T11 N=8 lógico 100 -> 5", ok && nb == 6,
@@ -559,28 +562,28 @@ module tb_spw_switch;
                             cap8m[5][0], cap8m[5][1], cap8m[5][2], nb));
 
         // 12. Porta 1 para a porta 0: chega em cfg_out sem o byte 0
-        push_rx(1, 9'h000); push_rx(1, 9'h0D1); push_rx(1, 9'h0D2); push_rx(1, 9'h102);
-        push_exp(1, 0, 9'h0D1); push_exp(1, 0, 9'h0D2); push_exp(1, 0, 9'h102);
+        push_rx(1, 9'h000); push_rx(1, 9'h0D1); push_rx(1, 9'h0D2); push_rx(1, EOP);
+        push_exp(1, 0, 9'h0D1); push_exp(1, 0, 9'h0D2); push_exp(1, 0, EOP);
         drain("T12", 200);
         sb_check("T12 caminho 0 em cfg_out sem cabeçalho");
 
         // 13. Pacote vindo de cfg_in
-        push_rx(0, 9'h002); push_rx(0, 9'h0E1); push_rx(0, 9'h0E2); push_rx(0, 9'h102);
-        push_exp(0, 2, 9'h0E1); push_exp(0, 2, 9'h0E2); push_exp(0, 2, 9'h102);
+        push_rx(0, 9'h002); push_rx(0, 9'h0E1); push_rx(0, 9'h0E2); push_rx(0, EOP);
+        push_exp(0, 2, 9'h0E1); push_exp(0, 2, 9'h0E2); push_exp(0, 2, EOP);
         drain("T13", 200);
         sb_check("T13 cfg_in caminho 2 sem cabeçalho");
-        push_rx(0, 9'h02C); push_rx(0, 9'h0E3); push_rx(0, 9'h102);
-        push_exp(0, 2, 9'h02C); push_exp(0, 2, 9'h0E3); push_exp(0, 2, 9'h102);
+        push_rx(0, 9'h02C); push_rx(0, 9'h0E3); push_rx(0, EOP);
+        push_exp(0, 2, 9'h02C); push_exp(0, 2, 9'h0E3); push_exp(0, 2, EOP);
         drain("T13", 200);
         sb_check("T13 cfg_in lógico 44 com cabeçalho");
         e0 = err_cnt[0];
-        push_rx(0, 9'h032); push_rx(0, 9'h0E4); push_rx(0, 9'h102);   // lógico 50 sem rota
+        push_rx(0, 9'h032); push_rx(0, 9'h0E4); push_rx(0, EOP);   // lógico 50 sem rota
         drain("T13", 200);
         pass_fail("T13 cfg_in lógico sem rota: err_route[0]", (err_cnt[0] - e0) == 1,
                   $sformatf("%0d pulsos", err_cnt[0] - e0));
         prog4(8'd60, 3'd5);                                  // porta 5 > N: não é rota
         e0 = err_cnt[1];
-        push_rx(1, 9'h03C); push_rx(1, 9'h0E5); push_rx(1, 9'h102);
+        push_rx(1, 9'h03C); push_rx(1, 9'h0E5); push_rx(1, EOP);
         drain("T13", 200);
         pass_fail("T13 rota para a porta N+1 não existe", (err_cnt[1] - e0) == 1,
                   $sformatf("%0d pulsos", err_cnt[1] - e0));
@@ -597,15 +600,15 @@ module tb_spw_switch;
                     push_rx(src, we);
                     push_exp(src, 0, we);
                 end
-                push_rx(src, 9'h102);
-                push_exp(src, 0, 9'h102);
+                push_rx(src, EOP);
+                push_exp(src, 0, EOP);
             end
         end
         drain("T14", 400);
         ok = (cp_t[0] - cp_h[0]) == 20;
         for (int pk = 0; pk < 4 && ok; pk++) begin
             for (int k = 0; k < 5; k++) begin
-                we = (k == 4) ? 9'h102 : (((pk % 2) == 0) ? 9'h0C0 : 9'h0A0) + 9'(k);
+                we = (k == 4) ? EOP : (((pk % 2) == 0) ? 9'h0C0 : 9'h0A0) + 9'(k);
                 if (capm[0][cp_h[0] + (pk * 5) + k] !== we) ok = 1'b0;
             end
         end
@@ -617,7 +620,7 @@ module tb_spw_switch;
         e0 = err_cnt[3];
         a0 = n_wr[0];
         cfg_ready4 = 1'b0;
-        push_rx(3, 9'h000); push_rx(3, 9'h0F1); push_rx(3, 9'h102);
+        push_rx(3, 9'h000); push_rx(3, 9'h0F1); push_rx(3, EOP);
         drain("T15", 200);
         cfg_ready4 = 1'b1;
         pass_fail("T15 err_route[3] pulsou 1 vez, nada em cfg_out",
@@ -627,8 +630,8 @@ module tb_spw_switch;
 
         // 16. Paralelo: 0 para 2 e 1 para 3
         p0 = par23;
-        send_pkt(0, 2, 1'b0, 8, 9'h102, 1'b1);
-        send_pkt(1, 3, 1'b0, 8, 9'h102, 1'b1);
+        send_pkt(0, 2, 1'b0, 8, EOP, 1'b1);
+        send_pkt(1, 3, 1'b0, 8, EOP, 1'b1);
         drain("T16", 200);
         sb_check("T16 0 -> 2 e 1 -> 3");
         pass_fail("T16 gravações nos mesmos ciclos", (par23 - p0) >= 8,
@@ -636,7 +639,7 @@ module tb_spw_switch;
 
         // 17. cfg_out_full_i = 1: para de ler a tx_fifo 0 até a wfull subir
         rd_stop[0] = 1'b1;
-        send_pkt(1, 0, 1'b0, 24, 9'h102, 1'b1);              // 25 palavras > 16 da tx_fifo
+        send_pkt(1, 0, 1'b0, 24, EOP, 1'b1);              // 25 palavras > 16 da tx_fifo
         for (int c = 0; c < 200 && !full4[0]; c++) tick();
         ok = full4[0];
         repeat (2) tick();
@@ -655,7 +658,7 @@ module tb_spw_switch;
         while (cap_cnt(3) < 2) tick();
         repeat (2) tick();
         cfg_ready4 = 1'b0;
-        push_exp(0, 3, 9'h0B1); push_exp(0, 3, 9'h0B2); push_exp(0, 3, 9'h101);
+        push_exp(0, 3, 9'h0B1); push_exp(0, 3, 9'h0B2); push_exp(0, 3, EEP);
         drain("T18", 200);
         cfg_ready4 = 1'b1;
         sb_check("T18 palavras + EEP");
@@ -668,7 +671,7 @@ module tb_spw_switch;
         for (int n = 0; n < 200; n++) begin
             dj = $urandom_range(N4);
             send_pkt(n % (N4 + 1), dj, (dj != 0) && 1'($urandom_range(1)), $urandom_range(20),
-                     ($urandom_range(9) == 0) ? 9'h101 : 9'h102, 1'b1);
+                     ($urandom_range(9) == 0) ? EEP : EOP, 1'b1);
         end
         drain("T19", 50000);
         stress = 1'b0;

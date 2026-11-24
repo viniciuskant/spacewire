@@ -14,22 +14,24 @@ module tb_sw_in_ctrl;
     localparam int N4  = 4;
     localparam int PW4 = $clog2(N4 + 1);
 
+    localparam logic [8:0] EOP = spw_pkg::CONST_EOP;   // 9'h100
+    localparam logic [8:0] EEP = spw_pkg::CONST_EEP;   // 9'h101
     localparam int RX_ASIZE = 6;             // 64 palavras (DEPTH_FIFO do codec)
-    localparam int RX_DEPTH = 1 << RX_ASIZE;
 
     logic [8:0]           rxq [$];      // palavras que ainda vão entrar na rx_fifo
     logic                 rx_winc4 = 1'b0;
     logic [8:0]           rx_wdata4 = '0;
-    logic [RX_ASIZE:0]    rx_free4;
+    logic [RX_ASIZE:0]    rx_cnt4;      // o_count da rx_fifo (palavras dentro)
+    logic                 rx_full4;
     logic [8:0]           in_data4;
     logic                 in_empty4;
     logic                 rd4;
 
-    sync_fifo #(.DSIZE(9), .ASIZE(RX_ASIZE)) u_rx4 (
-        .clk(clk), .rst_n(rst_n),
-        .winc(rx_winc4), .wdata(rx_wdata4),
-        .rinc(rd4), .rdata(in_data4), .rempty(in_empty4),
-        .free_space_o(rx_free4)
+    fifo #(.DSIZE(9), .ASIZE(RX_ASIZE)) u_rx4 (
+        .i_clk(clk), .i_rstn(rst_n),
+        .i_wr(rx_winc4), .i_wdata(rx_wdata4),
+        .i_rd(rd4), .o_rdata(in_data4), .o_empty(in_empty4),
+        .o_full(rx_full4), .o_count(rx_cnt4)
     );
 
     logic                 tbl_wr4, tbl_valid4;
@@ -130,7 +132,7 @@ module tb_sw_in_ctrl;
 
     // Palavras ainda não lidas: a entrar + em trânsito + dentro da rx_fifo.
     function automatic int rx_left();
-        return rxq.size() + int'(rx_winc4) + (RX_DEPTH - int'(rx_free4));
+        return rxq.size() + int'(rx_winc4) + int'(rx_cnt4);
     endfunction
 
     // Espera o cabeçalho passar pela rx_fifo e o pedido subir (ST_REQ).
@@ -229,7 +231,7 @@ module tb_sw_in_ctrl;
             end
             if (err4) err_open = 1'b1;
             else if (int'(dut4.state) == 0) err_open = 1'b0;
-            if (int'(dut4.state) == 3 && wv4 && wd4 !== 9'h101) begin
+            if (int'(dut4.state) == 3 && wv4 && wd4 !== EEP) begin
                 $display("[FAIL] monitor: ST_EEP gravou %03h (só 101) t=%0t", wd4, $time); mon_err++;
             end
             if (err4) err_cnt++;
@@ -265,7 +267,7 @@ module tb_sw_in_ctrl;
         @(posedge clk);
         #0.5;
         rx_winc4 = 1'b0;
-        if (rxq.size() != 0 && rx_free4 != '0) begin   // não escreve com a rx_fifo cheia
+        if (rxq.size() != 0 && !rx_full4) begin   // não escreve com a rx_fifo cheia
             rx_winc4  = 1'b1;
             rx_wdata4 = rxq[0];
             void'(rxq.pop_front());
@@ -298,23 +300,23 @@ module tb_sw_in_ctrl;
 
         // 1. Caminho 2: cabeçalho apagado
         req_seen = '0;
-        push4(9'h002); push4(9'h0A5); push4(9'h03C); push4(9'h102);
+        push4(9'h002); push4(9'h0A5); push4(9'h03C); push4(EOP);
         drain("T1");
-        exp_w[0] = 9'h0A5; exp_w[1] = 9'h03C; exp_w[2] = 9'h102;
+        exp_w[0] = 9'h0A5; exp_w[1] = 9'h03C; exp_w[2] = EOP;
         check_out("T1 caminho 2", 3);
         pass_fail("T1 req só no bit 2", req_seen == 5'b00100, $sformatf("req visto=%b", req_seen));
 
         // 2. Lógico 44 para porta 3: cabeçalho mantido
         req_seen = '0;
-        push4(9'h02C); push4(9'h011); push4(9'h022); push4(9'h102);
+        push4(9'h02C); push4(9'h011); push4(9'h022); push4(EOP);
         drain("T2");
-        exp_w[0] = 9'h02C; exp_w[1] = 9'h011; exp_w[2] = 9'h022; exp_w[3] = 9'h102;
+        exp_w[0] = 9'h02C; exp_w[1] = 9'h011; exp_w[2] = 9'h022; exp_w[3] = EOP;
         check_out("T2 lógico 44", 4);
         pass_fail("T2 req só no bit 3", req_seen == 5'b01000, $sformatf("req visto=%b", req_seen));
 
         // 3. gnt atrasado 5 ciclos: pede, mas não retira nem grava
         gnt_delay = 5;
-        push4(9'h002); push4(9'h055); push4(9'h102);
+        push4(9'h002); push4(9'h055); push4(EOP);
         wait_req();   // IDLE para REQ
         ok = 1'b1;
         msg = "";
@@ -329,7 +331,7 @@ module tb_sw_in_ctrl;
         if (ok) msg = "req=00100, nada retirado/gravado";
         pass_fail("T3 espera em ST_REQ por 5 ciclos", ok, msg);
         drain("T3");
-        exp_w[0] = 9'h055; exp_w[1] = 9'h102;
+        exp_w[0] = 9'h055; exp_w[1] = EOP;
         check_out("T3 pacote depois do gnt", 2);
         gnt_delay = 0;
 
@@ -342,15 +344,15 @@ module tb_sw_in_ctrl;
         repeat (4) tick();
         push4(9'h0CC);
         tick();
-        push4(9'h102);
+        push4(EOP);
         drain("T4");
-        exp_w[0] = 9'h0AA; exp_w[1] = 9'h0BB; exp_w[2] = 9'h0CC; exp_w[3] = 9'h102;
+        exp_w[0] = 9'h0AA; exp_w[1] = 9'h0BB; exp_w[2] = 9'h0CC; exp_w[3] = EOP;
         check_out("T4 chegada lenta", 4);
 
         // 5. out_full oscilando (a porta 4 cheia o tempo todo não deve importar)
         push4(9'h002);
         for (int k = 0; k < 6; k++) push4(9'h010 + 9'(k));
-        push4(9'h102);
+        push4(EOP);
         for (int c = 0; c < 40 && rx_left() != 0; c++) begin
             full4 = ((c % 3) != 2) ? 5'b10100 : 5'b10000;
             tick();
@@ -358,22 +360,22 @@ module tb_sw_in_ctrl;
         full4 = '0;
         drain("T5");
         for (int k = 0; k < 6; k++) exp_w[k] = 9'h010 + 9'(k);
-        exp_w[6] = 9'h102;
+        exp_w[6] = EOP;
         check_out("T5 saída cheia oscilando", 7);
 
         // 6. Dois pacotes seguidos para a mesma saída
         d0 = n_req_drop;
-        push4(9'h002); push4(9'h0A1); push4(9'h102);
-        push4(9'h002); push4(9'h0A2); push4(9'h102);
+        push4(9'h002); push4(9'h0A1); push4(EOP);
+        push4(9'h002); push4(9'h0A2); push4(EOP);
         drain("T6");
-        exp_w[0] = 9'h0A1; exp_w[1] = 9'h102; exp_w[2] = 9'h0A2; exp_w[3] = 9'h102;
+        exp_w[0] = 9'h0A1; exp_w[1] = EOP; exp_w[2] = 9'h0A2; exp_w[3] = EOP;
         check_out("T6 dois pacotes", 4);
         pass_fail("T6 req cai depois de cada EOP", (n_req_drop - d0) == 2,
                   $sformatf("%0d quedas de req (esperado 2)", n_req_drop - d0));
 
         // 7. EOP sozinho e EEP sozinho
         e0 = err_cnt;
-        push4(9'h102); push4(9'h101);
+        push4(EOP); push4(EEP);
         drain("T7");
         check_out("T7 marcadores sozinhos não gravam", 0);
         pass_fail("T7 sem err", err_cnt == e0 && rx_left() == 0,
@@ -382,14 +384,14 @@ module tb_sw_in_ctrl;
         // 8. Cabeçalhos inválidos: 6, 5, 31, 255, lógico 50 sem rota (0 agora é a porta 0)
         e0 = err_cnt;
         req_seen = '0;
-        push4(9'h006); push4(9'h0AA); push4(9'h102);
-        push4(9'h005); push4(9'h0BB); push4(9'h102);
-        push4(9'h01F); push4(9'h0CC); push4(9'h101);
-        push4(9'h0FF); push4(9'h0DD); push4(9'h102);
-        push4(9'h032); push4(9'h0EE); push4(9'h102);
-        push4(9'h002); push4(9'h0F0); push4(9'h102);   // válido depois
+        push4(9'h006); push4(9'h0AA); push4(EOP);
+        push4(9'h005); push4(9'h0BB); push4(EOP);
+        push4(9'h01F); push4(9'h0CC); push4(EEP);
+        push4(9'h0FF); push4(9'h0DD); push4(EOP);
+        push4(9'h032); push4(9'h0EE); push4(EOP);
+        push4(9'h002); push4(9'h0F0); push4(EOP);   // válido depois
         drain("T8");
-        exp_w[0] = 9'h0F0; exp_w[1] = 9'h102;
+        exp_w[0] = 9'h0F0; exp_w[1] = EOP;
         check_out("T8 só o pacote válido sai", 2);
         pass_fail("T8 err pulsou 5 vezes", (err_cnt - e0) == 5,
                   $sformatf("%0d pulsos (esperado 5)", err_cnt - e0));
@@ -398,20 +400,20 @@ module tb_sw_in_ctrl;
         // 9. Destino com link fora de Run (porta 3)
         e0 = err_cnt;
         run4 = 5'b10111;
-        push4(9'h003); push4(9'h0AB); push4(9'h102);   // caminho 3
-        push4(9'h02C); push4(9'h0AC); push4(9'h102);   // lógico 44 para 3
-        push4(9'h004); push4(9'h0AD); push4(9'h102);   // válido
+        push4(9'h003); push4(9'h0AB); push4(EOP);   // caminho 3
+        push4(9'h02C); push4(9'h0AC); push4(EOP);   // lógico 44 para 3
+        push4(9'h004); push4(9'h0AD); push4(EOP);   // válido
         drain("T9");
         run4 = 5'b11111;
-        exp_w[0] = 9'h0AD; exp_w[1] = 9'h102;
+        exp_w[0] = 9'h0AD; exp_w[1] = EOP;
         check_out("T9 descarta destino sem Run", 2);
         pass_fail("T9 err pulsou 2 vezes", (err_cnt - e0) == 2,
                   $sformatf("%0d pulsos (esperado 2)", err_cnt - e0));
 
         // 10. Pacote terminado em EEP
-        push4(9'h004); push4(9'h077); push4(9'h101);
+        push4(9'h004); push4(9'h077); push4(EEP);
         drain("T10");
-        exp_w[0] = 9'h077; exp_w[1] = 9'h101;
+        exp_w[0] = 9'h077; exp_w[1] = EEP;
         check_out("T10 EEP repassado", 2);
         pass_fail("T10 volta para ST_IDLE", int'(dut4.state) == 0 && req4 == '0,
                   $sformatf("state=%0d req=%b", int'(dut4.state), req4));
@@ -419,7 +421,7 @@ module tb_sw_in_ctrl;
         // 12. Destino cai em ST_REQ (gnt atrasado)
         e0 = err_cnt;
         gnt_delay = 5;
-        push4(9'h002); push4(9'h0B1); push4(9'h102);
+        push4(9'h002); push4(9'h0B1); push4(EOP);
         wait_req();                           // em ST_REQ esperando gnt
         ok  = (int'(dut4.state) == 1) && (req4 == 5'b00100);
         msg = $sformatf("antes: state=%0d req=%b", int'(dut4.state), req4);
@@ -432,31 +434,31 @@ module tb_sw_in_ctrl;
         gnt_delay = 0;
         run4 = 5'b11111;
         check_out("T12 pacote some inteiro", 0);
-        push4(9'h004); push4(9'h0B2); push4(9'h102);
+        push4(9'h004); push4(9'h0B2); push4(EOP);
         drain("T12b");
-        exp_w[0] = 9'h0B2; exp_w[1] = 9'h102;
+        exp_w[0] = 9'h0B2; exp_w[1] = EOP;
         check_out("T12 pacote seguinte passa", 2);
         pass_fail("T12 err pulsou 1 vez", (err_cnt - e0) == 1,
                   $sformatf("%0d pulsos (esperado 1)", err_cnt - e0));
 
         // 13. Destino cai no meio do envio
         e0 = err_cnt;
-        push4(9'h002); push4(9'h0C1); push4(9'h0C2); push4(9'h0C3); push4(9'h0C4); push4(9'h102);
-        push4(9'h004); push4(9'h0C5); push4(9'h102);   // próximo pacote
+        push4(9'h002); push4(9'h0C1); push4(9'h0C2); push4(9'h0C3); push4(9'h0C4); push4(EOP);
+        push4(9'h004); push4(9'h0C5); push4(EOP);   // próximo pacote
         while (outq.size() < 2) tick();                // C1 e C2 já gravados
         run4 = 5'b11011;                                // porta 2 cai
         drain("T13");
         run4 = 5'b11111;
-        exp_w[0] = 9'h0C1; exp_w[1] = 9'h0C2; exp_w[2] = 9'h101;
-        exp_w[3] = 9'h0C5; exp_w[4] = 9'h102;
+        exp_w[0] = 9'h0C1; exp_w[1] = 9'h0C2; exp_w[2] = EEP;
+        exp_w[3] = 9'h0C5; exp_w[4] = EOP;
         check_out("T13 palavras enviadas + EEP, resto descartado", 5);
         pass_fail("T13 err pulsou 1 vez", (err_cnt - e0) == 1,
                   $sformatf("%0d pulsos (esperado 1)", err_cnt - e0));
 
         // 14. Igual ao 13, mas a saída está cheia quando o link cai
         e0 = err_cnt;
-        push4(9'h002); push4(9'h0D1); push4(9'h0D2); push4(9'h0D3); push4(9'h102);
-        push4(9'h004); push4(9'h0D4); push4(9'h102);
+        push4(9'h002); push4(9'h0D1); push4(9'h0D2); push4(9'h0D3); push4(EOP);
+        push4(9'h004); push4(9'h0D4); push4(EOP);
         while (outq.size() < 1) tick();                // D1 gravado
         run4 = 5'b11011; full4 = 5'b00100;
         ok = 1'b1;
@@ -474,7 +476,7 @@ module tb_sw_in_ctrl;
         full4 = '0;
         drain("T14");
         run4 = 5'b11111;
-        exp_w[0] = 9'h0D1; exp_w[1] = 9'h101; exp_w[2] = 9'h0D4; exp_w[3] = 9'h102;
+        exp_w[0] = 9'h0D1; exp_w[1] = EEP; exp_w[2] = 9'h0D4; exp_w[3] = EOP;
         check_out("T14 EEP gravado depois de liberar", 4);
         pass_fail("T14 err pulsou 1 vez", (err_cnt - e0) == 1,
                   $sformatf("%0d pulsos (esperado 1)", err_cnt - e0));
@@ -486,16 +488,16 @@ module tb_sw_in_ctrl;
         tick();                                        // fila vazia, ST_SEND esperando
         run4 = 5'b11101;                                // porta 1 (esta entrada) cai
         drain("T15");
-        exp_w[0] = 9'h0E1; exp_w[1] = 9'h0E2; exp_w[2] = 9'h101;
+        exp_w[0] = 9'h0E1; exp_w[1] = 9'h0E2; exp_w[2] = EEP;
         check_out("T15 palavras + EEP", 3);
         pass_fail("T15 err 1 vez e volta para ST_IDLE",
                   (err_cnt - e0) == 1 && int'(dut4.state) == 0,
                   $sformatf("%0d pulsos, state=%0d", err_cnt - e0, int'(dut4.state)));
         run4 = 5'b11111;                                // reconecta
         tick();
-        push4(9'h002); push4(9'h0E3); push4(9'h102);
+        push4(9'h002); push4(9'h0E3); push4(EOP);
         drain("T15b");
-        exp_w[0] = 9'h0E3; exp_w[1] = 9'h102;
+        exp_w[0] = 9'h0E3; exp_w[1] = EOP;
         check_out("T15 pacote novo roteado (cabeçalho não engolido)", 2);
 
         // 16. Link da entrada cai, mas a fila ainda tem palavras
@@ -511,7 +513,7 @@ module tb_sw_in_ctrl;
         full4 = '0;
         drain("T16");
         run4 = 5'b11111;
-        exp_w[0] = 9'h0F1; exp_w[1] = 9'h0F2; exp_w[2] = 9'h0F3; exp_w[3] = 9'h101;
+        exp_w[0] = 9'h0F1; exp_w[1] = 9'h0F2; exp_w[2] = 9'h0F3; exp_w[3] = EEP;
         check_out("T16 copia o resto e só então EEP", 4);
         pass_fail("T16 err 1 vez e volta para ST_IDLE",
                   (err_cnt - e0) == 1 && int'(dut4.state) == 0,
@@ -531,20 +533,20 @@ module tb_sw_in_ctrl;
 
         // 18. Caminho 0: cabeçalho apagado
         req_seen = '0;
-        push4(9'h000); push4(9'h0A7); push4(9'h102);
+        push4(9'h000); push4(9'h0A7); push4(EOP);
         drain("T18");
-        exp_w[0] = 9'h0A7; exp_w[1] = 9'h102;
+        exp_w[0] = 9'h0A7; exp_w[1] = EOP;
         check_out("T18 caminho 0", 2);
         pass_fail("T18 req só no bit 0", req_seen == 5'b00001, $sformatf("req visto=%b", req_seen));
 
         // 19. Porta 0 fora de Run
         e0 = err_cnt;
         run4 = 5'b11110;
-        push4(9'h000); push4(9'h0A8); push4(9'h102);
-        push4(9'h004); push4(9'h0A9); push4(9'h102);   // válido
+        push4(9'h000); push4(9'h0A8); push4(EOP);
+        push4(9'h004); push4(9'h0A9); push4(EOP);   // válido
         drain("T19");
         run4 = 5'b11111;
-        exp_w[0] = 9'h0A9; exp_w[1] = 9'h102;
+        exp_w[0] = 9'h0A9; exp_w[1] = EOP;
         check_out("T19 descarta pacote para a porta 0", 2);
         pass_fail("T19 err pulsou 1 vez", (err_cnt - e0) == 1,
                   $sformatf("%0d pulsos (esperado 1)", err_cnt - e0));
@@ -562,8 +564,8 @@ module tb_sw_in_ctrl;
         in_data8 = 9'h0A8; #1;
         if (!(wv8 && rd8 && wd8 == 9'h0A8)) begin ok = 1'b0; msg = {msg, "dado não copiado; "}; end
         tick();
-        in_data8 = 9'h102; #1;
-        if (!(wv8 && rd8 && wd8 == 9'h102)) begin ok = 1'b0; msg = {msg, "EOP não copiado; "}; end
+        in_data8 = EOP; #1;
+        if (!(wv8 && rd8 && wd8 == EOP)) begin ok = 1'b0; msg = {msg, "EOP não copiado; "}; end
         tick();
         in_empty8 = 1'b1; gnt8 = 1'b0; #1;
         if (req8 !== '0 || int'(dut8.state) != 0) begin ok = 1'b0; msg = {msg, "não voltou a IDLE; "}; end
@@ -576,7 +578,7 @@ module tb_sw_in_ctrl;
         if (rd8 !== 1'b1) begin ok = 1'b0; msg = {msg, "cabeçalho 9 não retirado; "}; end
         tick();
         if (err8 !== 1'b1 || req8 !== '0) begin ok = 1'b0; msg = {msg, $sformatf("err8=%b req8=%b; ", err8, req8)}; end
-        in_data8 = 9'h102; #1;   // EOP do pacote descartado
+        in_data8 = EOP; #1;   // EOP do pacote descartado
         if (rd8 !== 1'b1 || wv8 !== 1'b0) begin ok = 1'b0; msg = {msg, "spill não retirou EOP; "}; end
         tick();
         in_empty8 = 1'b1; #1;
@@ -595,7 +597,7 @@ module tb_sw_in_ctrl;
         #1;
         if (!(wv8 && wd8 == 9'h064)) begin ok = 1'b0; msg = {msg, "cabeçalho lógico não gravado; "}; end
         tick();
-        in_data8 = 9'h102;
+        in_data8 = EOP;
         tick();
         in_empty8 = 1'b1; gnt8 = 1'b0; #1;
         if (int'(dut8.state) != 0) begin ok = 1'b0; msg = {msg, "não voltou a IDLE; "}; end

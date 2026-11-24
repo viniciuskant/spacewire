@@ -5,13 +5,16 @@ package host_driver_pkg;
 
   /// Drives the host side of the codec.
   ///
-  /// Packets are written to the TX FIFO word by word, holding each word until
-  /// full_tx_fifo is low. In parallel, the RX FIFO is drained on its own,
+  /// Packets are written to the TX buffer word by word, holding each word
+  /// until o_tx_full is low. In parallel, the RX buffer is drained on its own,
   /// reading on rx_read_pct percent of the cycles.
   ///
   /// Knobs (uvm_config_db #(int unsigned)):
-  ///   rx_read_pct: chance of reading the RX FIFO on a cycle, 0 to 100
+  ///   rx_read_pct: chance of reading the RX buffer on a cycle, 0 to 100
   ///   tx_gap_max:  max idle cycles between two TX words
+  ///   run_div:     i_run_div, the rate in Run is 200 MHz / (run_div + 1)
+  /// Knobs (uvm_config_db #(bit)), the link control inputs at reset:
+  ///   link_start (default 1), auto_start (0), link_disable (0)
   class host_driver extends uvm_driver #(host_base_item);
     `uvm_component_utils(host_driver)
 
@@ -23,7 +26,10 @@ package host_driver_pkg;
 
     int unsigned rx_read_pct = 100;
     int unsigned tx_gap_max = 0;
-    bit [7:0] tx_div = 8'd10; // 10 Mbit/s with the 200 MHz reference
+    int unsigned run_div = 19; // 10 Mbit/s with the 200 MHz reference
+    bit link_start = 1;
+    bit auto_start = 0;
+    bit link_disable = 0;
 
     function new(string name, uvm_component parent);
       super.new(name, parent);
@@ -38,18 +44,28 @@ package host_driver_pkg;
       end
       void'(uvm_config_db #(int unsigned)::get(this, "", "rx_read_pct", rx_read_pct));
       void'(uvm_config_db #(int unsigned)::get(this, "", "tx_gap_max", tx_gap_max));
+      void'(uvm_config_db #(int unsigned)::get(this, "", "run_div", run_div));
+      void'(uvm_config_db #(bit)::get(this, "", "link_start", link_start));
+      void'(uvm_config_db #(bit)::get(this, "", "auto_start", auto_start));
+      void'(uvm_config_db #(bit)::get(this, "", "link_disable", link_disable));
       if (rx_read_pct > 100) begin
         `uvm_fatal(get_type_name(), $sformatf("rx_read_pct must be <= 100, got %0d", rx_read_pct))
+      end
+      if (run_div > 127) begin
+        `uvm_fatal(get_type_name(), $sformatf("run_div must fit 7 bits, got %0d", run_div))
       end
     endfunction
 
     virtual task run_phase(uvm_phase phase);
-      vif.drv_cb.div_counter_tx <= tx_div;
-      vif.drv_cb.SpW_Packet_TX <= '0;
-      vif.drv_cb.SpW_Packet_TX_en <= 0;
-      vif.drv_cb.SpW_Packet_RX_en <= 0;
-      vif.drv_cb.Time_Code_TX <= '0;
-      vif.drv_cb.Time_Code_TX_valid <= 0;
+      vif.drv_cb.i_run_div <= run_div;
+      vif.drv_cb.i_link_start <= link_start;
+      vif.drv_cb.i_auto_start <= auto_start;
+      vif.drv_cb.i_link_disable <= link_disable;
+      vif.drv_cb.i_tx_wdata <= '0;
+      vif.drv_cb.i_tx_wr <= 0;
+      vif.drv_cb.i_rx_rd <= 0;
+      vif.drv_cb.i_timecode <= '0;
+      vif.drv_cb.i_tick <= 0;
 
       wait (vif.rst_n === 1);
       fork
@@ -79,9 +95,17 @@ package host_driver_pkg;
         end
         else if ($cast(cfg, item)) begin
           case (cfg.typ)
-            HOST_CFG_TX_DIV: begin
-              tx_div = cfg.tx_div;
-              vif.drv_cb.div_counter_tx <= tx_div;
+            HOST_CFG_RUN_DIV: begin
+              run_div = cfg.run_div;
+              vif.drv_cb.i_run_div <= cfg.run_div;
+            end
+            HOST_CFG_LINK: begin
+              link_start = cfg.link_start;
+              auto_start = cfg.auto_start;
+              link_disable = cfg.link_disable;
+              vif.drv_cb.i_link_start <= link_start;
+              vif.drv_cb.i_auto_start <= auto_start;
+              vif.drv_cb.i_link_disable <= link_disable;
             end
             default: `uvm_fatal(get_type_name(), "invalid cfg item type")
           endcase
@@ -100,33 +124,35 @@ package host_driver_pkg;
       foreach (words[i]) begin
         int unsigned gap = (i == 0) ? 0 : $urandom_range(tx_gap_max);
         if (gap > 0) begin
-          vif.drv_cb.SpW_Packet_TX_en <= 0;
+          vif.drv_cb.i_tx_wr <= 0;
           repeat (gap) @(vif.drv_cb);
         end
         send_word(words[i]);
       end
-      vif.drv_cb.SpW_Packet_TX_en <= 0;
+      vif.drv_cb.i_tx_wr <= 0;
     endtask
 
     // Must be called right after a clock edge. Returns right after the edge
     // where the DUT took the word, so words can go back to back.
     protected task send_word(bit [8:0] w);
-      vif.drv_cb.SpW_Packet_TX <= w;
-      vif.drv_cb.SpW_Packet_TX_en <= 1;
-      do @(vif.drv_cb); while (vif.drv_cb.full_tx_fifo !== 0);
+      vif.drv_cb.i_tx_wdata <= w;
+      vif.drv_cb.i_tx_wr <= 1;
+      do @(vif.drv_cb); while (vif.drv_cb.o_tx_full !== 0);
     endtask
 
+    // One-cycle tick. The DUT drops it if it is not in Run or still holds the
+    // previous timecode: sequences have to space them (see host_timecode_seq)
     protected task send_timecode(host_timecode_item tc);
-      vif.drv_cb.Time_Code_TX <= tc.value;
-      vif.drv_cb.Time_Code_TX_valid <= 1;
+      vif.drv_cb.i_timecode <= tc.value;
+      vif.drv_cb.i_tick <= 1;
       @(vif.drv_cb);
-      vif.drv_cb.Time_Code_TX_valid <= 0;
+      vif.drv_cb.i_tick <= 0;
     endtask
 
     protected task drain_rx();
       forever begin
         @(vif.drv_cb);
-        vif.drv_cb.SpW_Packet_RX_en <= ($urandom_range(99) < rx_read_pct);
+        vif.drv_cb.i_rx_rd <= ($urandom_range(99) < rx_read_pct);
       end
     endtask
 

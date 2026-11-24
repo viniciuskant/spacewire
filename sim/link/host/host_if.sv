@@ -1,39 +1,50 @@
-/// Host side of the codec (rtl/codec.sv). Signal names follow the DUT ports.
-/// Everything is synchronous to clk_system.
+/// Host side of the codec (rtl/codec/codec.sv). Signal names follow the DUT
+/// ports. Everything is synchronous to clk_system.
 interface spw_host_if (
   input logic clk_system,
   input logic rst_n
 );
-  logic [7:0] div_counter_tx;
+  // TX buffer: [8] = 0 -> data in [7:0], [8] = 1 -> EOP (9'h100) / EEP (9'h101)
+  logic i_tx_wr;
+  logic [8:0] i_tx_wdata;
+  logic o_tx_full;
 
-  // TX FIFO: [8] = 0 -> data in [7:0], [8] = 1 -> control (EOP/EEP)
-  logic [8:0] SpW_Packet_TX;
-  logic SpW_Packet_TX_en;
-  logic full_tx_fifo;
+  // RX buffer, first word fall through: o_rx_rdata is valid while o_rx_valid
+  logic i_rx_rd;
+  logic [8:0] o_rx_rdata;
+  logic o_rx_valid;
 
-  // RX FIFO, first word fall through: SpW_Packet_RX is valid while !empty_rx_fifo
-  logic [8:0] SpW_Packet_RX;
-  logic SpW_Packet_RX_en;
-  logic empty_rx_fifo;
+  // time-codes, one-cycle ticks
+  logic i_tick;
+  logic [7:0] i_timecode;
+  logic o_tick;
+  logic [7:0] o_timecode;
 
-  logic [7:0] Time_Code_TX;
-  logic Time_Code_TX_valid;
-  logic [7:0] Time_Code_RX;
-  logic Time_Code_RX_valid;
+  // link control
+  logic i_link_start;
+  logic i_auto_start;
+  logic i_link_disable;
+  logic [6:0] i_run_div; // run rate = 200 MHz / (i_run_div + 1)
+
+  // status
+  logic [2:0] o_link_state; // spw_pkg::e_link_state
+  logic o_link_run;
+  logic o_link_error;
 
   clocking drv_cb @(posedge clk_system);
-    output div_counter_tx;
-    output SpW_Packet_TX, SpW_Packet_TX_en;
-    output SpW_Packet_RX_en;
-    output Time_Code_TX, Time_Code_TX_valid;
-    input full_tx_fifo, empty_rx_fifo;
+    output i_tx_wr, i_tx_wdata;
+    output i_rx_rd;
+    output i_tick, i_timecode;
+    output i_link_start, i_auto_start, i_link_disable, i_run_div;
+    input o_tx_full, o_rx_valid;
   endclocking
 
   clocking mon_cb @(posedge clk_system);
-    input SpW_Packet_TX, SpW_Packet_TX_en, full_tx_fifo;
-    input SpW_Packet_RX, SpW_Packet_RX_en, empty_rx_fifo;
-    input Time_Code_TX, Time_Code_TX_valid;
-    input Time_Code_RX, Time_Code_RX_valid;
+    input i_tx_wr, i_tx_wdata, o_tx_full;
+    input i_rx_rd, o_rx_rdata, o_rx_valid;
+    input i_tick, i_timecode;
+    input o_tick, o_timecode;
+    input o_link_state, o_link_run, o_link_error;
   endclocking
 
 endinterface

@@ -230,8 +230,8 @@ module tb_RMAP;
             if (type_erro == RMAP_ERR_INVALID_HEADER_CRC) b = ~header_crc; // Injeta erro (CRC invertido)
             send_byte({1'b0, b});
 
-            if (type_erro == RMAP_ERR_EARLY_EOP) send_byte({1'b1, 8'h02});
-            if (type_erro == RMAP_ERR_EARLY_EEP) send_byte({1'b1, 8'h01}); // EEP logo depois do CRC do cabeçalho
+            if (type_erro == RMAP_ERR_EARLY_EOP) send_byte(spw_pkg::CONST_EOP);
+            if (type_erro == RMAP_ERR_EARLY_EEP) send_byte(spw_pkg::CONST_EEP); // EEP logo depois do CRC do cabeçalho
             
         end
     endtask
@@ -297,7 +297,7 @@ module tb_RMAP;
         logic [7:0] status_to_wait;
         begin
             if (type_erro == RMAP_ERR_CARGO_TOO_LARGE) send_byte(9'h1ff);
-            else send_byte(9'h102);
+            else send_byte(spw_pkg::CONST_EOP);
             
             @(posedge clk);
             rx_valid <= 1'b0;
@@ -446,7 +446,7 @@ module tb_RMAP;
         logic [31:0] current_word;
         logic [7:0] status_to_wait;
         begin
-            send_byte(9'h102);
+            send_byte(spw_pkg::CONST_EOP);
             
             @(posedge clk);
             rx_valid <= 1'b0;
@@ -646,7 +646,7 @@ module tb_RMAP;
         integer idx;
         logic [7:0] status_to_wait;
         begin
-            send_byte(9'h102);
+            send_byte(spw_pkg::CONST_EOP);
             
             @(posedge clk);
             rx_valid <= 1'b0;

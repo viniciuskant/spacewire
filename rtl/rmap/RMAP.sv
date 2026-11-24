@@ -1,5 +1,6 @@
 // TODO analisar um caso que acabei de pensar depois, mas se ocorre um erro e depois ocorre um erro que não e o EOP isso pode quebrar a máquina de estados
-// ver de criar um "counter externo que sinaliza um erro de Cargo too large
+// ver de criar um "counter externo que sinaliza um erro de Cargo too large 
+// Ainda pensar no processo, Revisar
 
 module RMAP (
     input logic clk,
@@ -40,8 +41,8 @@ module RMAP (
     localparam logic [3:0] CMD_READ_MODIFY_WRITE = 4'b0111;
     localparam logic [3:0] CMD_WRITE = 4'b1110;
 
-    localparam logic [8:0] EEP_PACKET = 9'h101;
-    localparam logic [8:0] EOP_PACKET = 9'h102;
+    localparam logic [8:0] EEP_PACKET = spw_pkg::CONST_EEP;   // 9'h101 Troca para parametros do codec
+    localparam logic [8:0] EOP_PACKET = spw_pkg::CONST_EOP;   // 9'h100
 
     logic [8:0] cnt_rst;
     localparam logic [8:0] REG_BASE_ADDR = 9'h100; 

@@ -6,8 +6,8 @@ package host_selftest_env_pkg;
   `include "uvm_macros.svh"
 
   /// Loopback env: the top feeds the TX FIFO straight into the RX FIFO and
-  /// Time_Code_TX into Time_Code_RX. Checks driver -> TX monitor (nothing is
-  /// lost while full_tx_fifo is high) and TX monitor -> RX monitor.
+  /// i_tick/i_timecode into o_tick/o_timecode. Checks driver -> TX monitor
+  /// (nothing is lost while o_tx_full is high) and TX monitor -> RX monitor.
   class host_selftest_env extends uvm_env;
     `uvm_component_utils(host_selftest_env)
 

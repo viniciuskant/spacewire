@@ -20,10 +20,10 @@ module tb_spw_router;
 
     localparam int N        = 4;
     localparam int PW       = $clog2(N + 1);
-    localparam int RX_ASIZE = 6;             // sync_fifo: 64 palavras
+    localparam int RX_ASIZE = 6;             // fifo: 64 palavras
     localparam int TX_ASIZE = 4;             // async_fifo: 16 palavras
 
-    localparam logic [8:0] EOP = 9'h102;
+    localparam logic [8:0] EOP = spw_pkg::CONST_EOP;   // 9'h100
 
     // RMAP
     localparam logic [7:0] KEY       = 8'hAA;      // DESTINATION_KEY do reset do RMAP
@@ -37,7 +37,7 @@ module tb_spw_router;
     logic [N:1]            in_empty, rd, full, wr;
     logic [N:1]            rx_winc = '0;
     logic [N:1][8:0]       rx_wdata = '0;
-    logic [N:1][RX_ASIZE:0] rx_free;
+    logic [N:1]            rx_full;
     logic [N:1]            tx_rinc = '0;
     logic [N:1]            tx_empty;
     logic [N:1][8:0]       tx_rdata;
@@ -68,18 +68,18 @@ module tb_spw_router;
 
     // FIFOs reais nas portas físicas
     for (genvar p = 1; p <= N; p++) begin : g_fifo
-        sync_fifo #(.DSIZE(9), .ASIZE(RX_ASIZE)) u_rx (
-            .clk(clk), .rst_n(rst_n),
-            .winc(rx_winc[p]), .wdata(rx_wdata[p]),
-            .rinc(rd[p]), .rdata(in_data[p]), .rempty(in_empty[p]),
-            .free_space_o(rx_free[p])
+        fifo #(.DSIZE(9), .ASIZE(RX_ASIZE)) u_rx (
+            .i_clk(clk), .i_rstn(rst_n),
+            .i_wr(rx_winc[p]), .i_wdata(rx_wdata[p]),
+            .i_rd(rd[p]), .o_rdata(in_data[p]), .o_empty(in_empty[p]),
+            .o_full(rx_full[p]), .o_count()
         );
 
         async_fifo #(.DSIZE(9), .ASIZE(TX_ASIZE)) u_tx (
-            .wclk(clk), .wrst_n(rst_n),
-            .winc(wr[p]), .wdata(out_data[p]), .wfull(full[p]),
-            .rclk(rclk), .rrst_n(rst_n),
-            .rinc(tx_rinc[p]), .rdata(tx_rdata[p]), .rempty(tx_empty[p])
+            .i_wclk(clk), .i_wrst_n(rst_n),
+            .i_wr(wr[p]), .i_wdata(out_data[p]), .o_wfull(full[p]),
+            .i_rclk(rclk), .i_rrst_n(rst_n),
+            .i_rd(tx_rinc[p]), .o_rdata(tx_rdata[p]), .o_rempty(tx_empty[p])
         );
     end
 
@@ -313,7 +313,7 @@ module tb_spw_router;
         #0.5;
         for (int p = 1; p <= N; p++) begin
             rx_winc[p] = 1'b0;
-            if (rxq[p].size() != 0 && rx_free[p] != '0) begin   // não escreve com a rx_fifo cheia
+            if (rxq[p].size() != 0 && !rx_full[p]) begin   // não escreve com a rx_fifo cheia
                 rx_winc[p]  = 1'b1;
                 rx_wdata[p] = rxq[p].pop_front();
             end

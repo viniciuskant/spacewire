@@ -19,7 +19,7 @@ source "${DC_DIR}/scripts/dc_setup.tcl"
 
 # Executa os scripts
 source "${DC_DIR}/scripts/read.tcl"
-source "${CONSTRAINTS_DIR}/constraints.tcl"
+source "${CONSTRAINTS_DIR}/codec.tcl"
 source "${DC_DIR}/scripts/compile.tcl"
 
 # exit

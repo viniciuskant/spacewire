@@ -35,21 +35,33 @@ package codec_test_lib_pkg;
       uvm_config_db #(bit)::set(this, "env0.ds0", "has_partner", 1);
     endfunction
 
-    // returns 0 if the link did not come up in tmo
+    // Returns 0 if the link did not come up in tmo. Up means both ends are
+    // in Run: the DUT drops timecodes it gets before Run, and it can get
+    // there a character after the partner.
     protected task wait_link_up(realtime tmo, output bit ok);
       fork
         begin
           fork
-            env0.ds0.partner.link_up_ev.wait_on();
+            begin
+              env0.ds0.partner.link_up_ev.wait_on();
+              wait (host_vif.o_link_run === 1);
+            end
             #(tmo);
           join_any
           disable fork;
         end
       join
-      ok = env0.ds0.partner.link_is_up();
+      ok = env0.ds0.partner.link_is_up() && host_vif.o_link_run === 1;
       if (!ok)
-        `uvm_error(get_type_name(), $sformatf("link not up %0t after the start of the test", tmo))
+        `uvm_error(get_type_name(), $sformatf("link not up %0t after the start of the test: partner in %s, DUT o_link_run=%b",
+                                              tmo, env0.ds0.partner.state.name(), host_vif.o_link_run))
     endtask
+
+    // the DUT pulses o_link_error for every fault it sees in Run
+    protected function void check_no_dut_link_errors();
+      if (env0.host0.m0.link_errors != 0)
+        `uvm_error(get_type_name(), $sformatf("DUT reported %0d link errors", env0.host0.m0.link_errors))
+    endfunction
 
     // returns the time reset was released
     protected task wait_reset_done(output realtime t);
@@ -190,8 +202,9 @@ package codec_test_lib_pkg;
         `uvm_info(get_type_name(), $sformatf("link up %0.2fus after reset",
                                              (env0.ds0.partner.t_link_up - t_reset) / 1us), UVM_LOW)
         #(hold_time);
-        if (env0.ds0.partner.link_ups != 1 || !env0.ds0.partner.link_is_up())
-          `uvm_error(get_type_name(), $sformatf("link did not stay up for %0t: %0d link ups, now in %s",
+        check_no_dut_link_errors();
+        if (env0.ds0.partner.link_ups != 1 || !env0.ds0.partner.link_is_up() || host_vif.o_link_run !== 1)
+          `uvm_error(get_type_name(), $sformatf("link did not stay up for %0t: %0d link ups, partner in %s",
                                                 hold_time, env0.ds0.partner.link_ups,
                                                 env0.ds0.partner.state.name()))
       end
@@ -251,6 +264,7 @@ package codec_test_lib_pkg;
         join_any
         disable fork;
         env0.sb.wait_drained(500us);
+        check_no_dut_link_errors();
         if (env0.ds0.partner.link_ups != 1)
           `uvm_error(get_type_name(), $sformatf("link went down during the test (%0d link ups)",
                                                 env0.ds0.partner.link_ups))

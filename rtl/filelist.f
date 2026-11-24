@@ -1,39 +1,43 @@
-rtl/fifos/fifomem.sv
-rtl/fifos/rptr_empty.sv
-rtl/fifos/sync_r2w.sv
-rtl/fifos/sync_w2r.sv
-rtl/fifos/wptr_full.sv
-rtl/fifos/async_fifo.sv
-rtl/fifos/sync_fifo.sv
 
-rtl/codec/var_clk_divider.sv
-rtl/codec/cdc_sync.sv
+spw_pkg.sv
 
-rtl/codec/spw_char_decode.sv
+common/async_fifo.sv
+common/sync_2ff.sv
+common/sync_gray_counter.sv
+common/fifo.sv
+common/reset_sync.sv
 
-rtl/codec/flow_control_rx.sv
-rtl/codec/flow_control_tx.sv
-rtl/codec/flow_control.sv
+codec/tx/cdc_sys_tx.sv
+codec/tx/tx_ds_encoder.sv
+codec/tx/tx_enable_gen.sv
+codec/tx/tx_selector.sv
+codec/tx/tx_serializer.sv
+codec/tx/tx_spill.sv
+codec/tx/tx_timecode_slot.sv
+codec/tx/tx.sv
 
+codec/rx/cdc_sys_rx.sv
+codec/rx/rx_decoder.sv
+codec/rx/rx_clk_rec.sv
+codec/rx/rx_ds_capture.sv
+codec/rx/rx_link_mon.sv
+codec/rx/rx_buffer_wr.sv
+codec/rx/rx.sv
 
-rtl/codec/rx_signal.sv
-rtl/codec/rx_char.sv
-rtl/codec/rx.sv
+codec/credit.sv
+codec/state_machine.sv
+codec/codec.sv
 
-rtl/codec/tx_fifo_to_char.sv
-rtl/codec/tx_char.sv
-rtl/codec/tx_signal.sv
-rtl/codec/tx_enable_gen.sv
-rtl/codec/tx.sv
+rmap/rmap_crc8.sv
+rmap/rmap_reg_bank.sv
+rmap/RMAP.sv
+rmap/coded_port_zero.sv
 
-rtl/codec/error_cleanup_fsm.sv
-rtl/codec/state_machine.sv
+router/sw_route_table.sv
+router/sw_in_ctrl.sv
+router/sw_out_arb.sv
+router/sw_crossbar.sv
+router/sw_tc_unit.sv
+router/spw_switch.sv
 
-rtl/codec/codec.sv
-
-rtl/rmap/rmap_crc8.sv
-rtl/rmap/rmap_reg_bank.sv
-rtl/rmap/RMAP.sv
-rtl/rmap/coded_port_zero.sv
-
-rtl/top/spw_router.sv
+top/spw_router.sv
