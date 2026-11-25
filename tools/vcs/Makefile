@@ -8,7 +8,7 @@ SIM_ARGS:=+ntb_random_seed=$(SEED) +UVM_VERBOSITY=$(UVM_VERBOSITY) +UVM_NO_RELNO
 
 # $(1): test name, $(2): top module, $(3): filelist
 define run_test
-	mkdir -p work && cd work && vcs $(VCS_ARGS) -top $(2) -F ../$(SIM_ROOT)/$(3) \
+	mkdir -p work/$(1) && cd work && vcs $(VCS_ARGS) -top $(2) -F ../$(SIM_ROOT)/$(3) \
 		-Mdir=$(1)/csrc -o $(1)/simv -l $(1)_compile.log
 	cd work && ./$(1)/simv +UVM_TESTNAME=$(1) $(SIM_ARGS) -l $(1)_run.log
 endef
@@ -22,7 +22,7 @@ host_selftest:
 # build once, then run any codec test: make codec TEST=codec_smoke_test
 TEST?=codec_smoke_test
 codec:
-	mkdir -p work && cd work && vcs $(VCS_ARGS) -top codec_top -F ../$(SIM_ROOT)/codec.f \
+	mkdir -p work/$(1) && cd work && vcs $(VCS_ARGS) -top codec_top -F ../$(SIM_ROOT)/codec.f \
 		-Mdir=codec/csrc -o codec/simv -l codec_compile.log
 	cd work && ./codec/simv +UVM_TESTNAME=$(TEST) $(SIM_ARGS) -l $(TEST)_run.log
 
