@@ -24,7 +24,7 @@ compile_ultra -no_autoungroup -gate_clock
 #insert_dft
 
 # Reports pós compile
-report_timing                     > $REPORTS_DIR/2_post_compile_timing.rpt
+report_timing -delay_type max -max_paths 3 > $REPORTS_DIR/2_post_compile_timing.rpt
 report_qor                        > $REPORTS_DIR/2_post_compile_qor.rpt
 report_constraints -all_violators > $REPORTS_DIR/2_post_compile_constraints.rpt
 report_power       -verbose       > $REPORTS_DIR/2_post_compile_power.rpt
@@ -48,7 +48,7 @@ compile_ultra -incremental
 #write_scan_def -output                           $PRE_LAYOUT_DIR/$DESIGN.scandeff
 
 # Reports pós incremental
-report_timing                     > $REPORTS_DIR/3_inc_compile_timing.rpt
+report_timing -delay_type max -max_paths 3 -input_pins -nets -transition_time -capacitance > $REPORTS_DIR/3_inc_compile_timing.rpt
 report_qor                        > $REPORTS_DIR/3_inc_compile_qor.rpt
 report_constraints -all_violators > $REPORTS_DIR/3_inc_compile_constraints.rpt
 report_power       -verbose       > $REPORTS_DIR/3_inc_compile_power.rpt

@@ -48,8 +48,20 @@ module tx_serializer (
     // character boundary: the current character's last bit ends here
     wire boundary = tx_enable && bit_en && (shift_counter <= 1);
 
-    // pop the payload from the fifo at a boundary; while disabled, keep popping to flush
-    assign pop = (boundary && valid) || !tx_enable;
+    // // pop the payload from the fifo at a boundary; while disabled, keep popping to flush
+    // assign pop = (boundary && valid) || !tx_enable;
+
+    /*
+        TODO verificar o comportamento no futuro, mas:
+
+        pop = ((tx_enable && bit_en && (shift_counter <= 1)) && valid) || !tx_enable
+            = (tx_enable && bit_en && (shift_counter <= 1) && valid) || !tx_enable
+            = !tx_enable || (tx_enable && bit_en && (shift_counter <= 1) && valid)  
+            >>> se ele não for falso, então ele é verdadeiro, logo ele some depois do ||
+            = !tx_enable || (bit_en && (shift_counter <= 1) && valid)
+    */
+
+    assign pop =  !tx_enable || (bit_en && (shift_counter <= 1) && valid);
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
