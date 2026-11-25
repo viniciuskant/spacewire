@@ -17,7 +17,6 @@ module tx_enable_gen (
     // if low, the `clk_div` gets overwritten with the 10MHz rate
     input logic use_run_rate,
     // generated `enable`
-    // TODO: maybe register this
     output logic bit_en
 );
 // 200MHz / (19 + 1) = 10MHz
@@ -25,11 +24,17 @@ localparam [6:0] START_DIV = 19;
 logic [6:0] counter;
 wire [6:0] div = use_run_rate ? clk_div : START_DIV;
 
+wire [6:0] next_counter = (counter == 0) ? div : counter - 1;
 always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) counter <= START_DIV;
-    else if (!tx_enable) counter <= START_DIV;
-    else if (counter == 0) counter <= div;
-    else counter <= counter - 1;
+    if (!rst_n) begin
+        counter <= START_DIV;
+        bit_en <= 0;
+    end else if (!tx_enable) begin
+        counter <= START_DIV;
+        bit_en <= 0;
+    end else begin
+        counter <= next_counter;
+        bit_en <= next_counter == 0;
+    end
 end
-assign bit_en = tx_enable && (counter == 0);
 endmodule
