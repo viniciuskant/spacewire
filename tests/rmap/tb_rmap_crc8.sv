@@ -74,7 +74,8 @@ module tb_rmap_crc8;
         pkt[2] = 8'h4C;
         
         foreach (pkt[i]) begin
-            logic [7:0] expected_crc = calc_crc8_ref(seed, pkt[i]);
+            logic [7:0] expected_crc;
+            expected_crc = calc_crc8_ref(seed, pkt[i]);
             run_test(seed, pkt[i]);
             $display("  Byte %0d: Data=0x%02h -> CRC=0x%02h", i+1, pkt[i], crc_out);
             seed = crc_out;

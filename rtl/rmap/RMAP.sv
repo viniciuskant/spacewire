@@ -194,9 +194,10 @@ module RMAP (
         reg_bank_w_addr = 9'h0;
         reg_bank_w_data = 32'h0;
         rx_error_code = '0;
-        tx_crc_data_in = tx_data[7:0];
+        tx_data = '0; // default
+        tx_reg_bank_r_en = 1'b0; // default
+        reg_bank_r_en = 1'b0; // default
         reg_bank_r_addr = tx_reg_bank_r_addr;
-        reg_bank_r_en = tx_reg_bank_r_en;
         rx_crc_valid = rx_valid_reg;
         busy = 1'b0;
         tx_valid = 1'b0;
@@ -738,8 +739,7 @@ module RMAP (
                             tx_reg_bank_r_en = 1'b1;
                         end
                         CMD_READ_MODIFY_WRITE: begin
-                            reg_bank_r_addr = tx_reg_bank_r_addr;
-                            reg_bank_r_en = 1'b1;
+                            tx_reg_bank_r_en = 1'b1;
                             next_state = TX_COMMAND_RMW_STATE; 
                         end
                         default: next_state = TX_EOP_STATE;
@@ -822,6 +822,9 @@ module RMAP (
 
             default: next_state = RX_IDLE;
         endcase
+
+        tx_crc_data_in = tx_data[7:0];
+        if (tx_reg_bank_r_en) reg_bank_r_en = 1'b1;
     end
 
     always_ff @(posedge clk or negedge rst_n) begin

@@ -152,6 +152,7 @@ module tb_RMAP;
     endtask
 
     logic [7:0] source_path_base;
+    logic [7:0] source_path_base_reply; 
     task automatic send_header(
         input  logic [7:0] instruction,
         input  logic [15:0] transaction_id,
@@ -426,7 +427,6 @@ module tb_RMAP;
     endtask
 
 
-    logic [7:0] source_path_base_reply;
         task automatic finish_read_command(
         input string test_name,
         input logic [3:0] command_read, 
