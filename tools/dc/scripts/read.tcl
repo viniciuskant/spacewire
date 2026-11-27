@@ -1,6 +1,5 @@
 # read in design
 # do not put testbench in the list below
-set_svf $PRE_LAYOUT_DIR/${DESIGN}.svf
 set_app_var hdlin_enable_hier_map true
 set verilogout_show_unconnected_pins true
 
@@ -11,33 +10,47 @@ set verilogout_show_unconnected_pins true
 # puts "=== Analyzing [llength $sv_files] files SystemVerilog"
 
 # analyze -format sverilog -library WORK $sv_files
-# elaborate $TOP_MODULE_NAME -library WORK
+# elaborate $DESIGN -library WORK
 
 # # build gtech design
-# current_design $TOP_MODULE_NAME
+# current_design $DESIGN
 # link
 # set_verification_top
 # uniquify
 
 # Verilog
-set v_files [split [exec find $RTL_DIR -name "*.sv"] "\n"]
 
+set v_files {}
 
-if {[llength $v_files] > 0} {
-    analyze -format sverilog -define $PDK_MACRO -vcs "+incdir+${RTL_DIR}" $v_files
-} else {
-    puts "ERROR: No .sv files found in $RTL_DIR"
+set fp [open "${RTL_DIR}/filelist.f" r]
+
+while {[gets $fp line] >= 0} {
+    set line [string trim $line]
+
+    if {$line eq "" || [string match "#*" $line]} {
+        continue
+    }
+
+    lappend v_files [file normalize "${RTL_DIR}/${line}"]
 }
 
-echo $v_files
+close $fp
 
-elaborate $TOP_MODULE_NAME
-set_verification_top
+# Analyze RTL
+foreach file $v_files {
+    analyze -format sverilog $file
+}
 
-# build gtech design
-current_design $TOP_MODULE_NAME
+# Elaborate top module
+elaborate $DESIGN
+
+# Select top module
+current_design $DESIGN
+
+# Check hierarchy
 link
-uniquify
+
+# uniquify
 
 
 # DFT spec
@@ -60,7 +73,3 @@ uniquify
 
 # check design
 check_design > $REPORTS_DIR/dc_check_design.rpt
-
-write -f ddc -hier -out  $PRE_LAYOUT_DIR/${DESIGN}_unmapped.ddc
-
-

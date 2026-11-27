@@ -10,12 +10,12 @@ export SETUP_DIR="$PROJECT_ROOT/common/setup"
 export TOOLS_DIR="$PROJECT_ROOT/tools"
 export DC_DIR="${TOOLS_DIR}/dc"
 export FC_DIR="${TOOLS_DIR}/fc"
-export FM_DIR="${TOOLS_DIR}/dc/fm"
-export VCS_DIR="${TOOLS_DIR}/dc/vcs"
+export FM_DIR="${TOOLS_DIR}/fm"
+export VCS_DIR="${TOOLS_DIR}/vcs"
 
 
 export PDK_MACRO=IHP130   # or SAED32, or SAED90, or IHP130, or NULL
-export TOP_MODULE_NAME="spw_codec"
+export DESIGN="codec"
 
 ### MODULES
 MODULES=(

@@ -1,6 +1,6 @@
 import spw_pkg::*;
 
-module spw_codec #(
+module codec #(
     parameter int RX_AW       = 6,        // receive buffer: 2**RX_AW entries (64)
     parameter int TX_AW       = 6         // host TX FIFO:   2**TX_AW entries (64)
 )(

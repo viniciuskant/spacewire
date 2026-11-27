@@ -3,7 +3,7 @@ set DC_DIR $DC_DIR
 set PDK_MACRO $PDK_MACRO
 
 # design setting
-set DESIGN rvx
+set DESIGN $DESIGN
 
 
 # Seleciona o setup correspondente ou aborta com erro
@@ -32,17 +32,30 @@ set RUN_NAME [clock format [clock seconds] -format "%Y%m%d_%H%M%S"]
 
 set RUN_DIR "${DC_DIR}/runs/$RUN_NAME"
 
-set REPORTS_DIR  "$RUN_DIR/reports/syn"
+set REPORTS_DIR  "$RUN_DIR/reports/"
 set OUTPUTS_DIR  "$RUN_DIR/outputs"
 set WORK_DIR  "$RUN_DIR/work"
 set SNAPSHOT_DIR "$RUN_DIR/snapshots"
-set FORMALITY_DIR "$RUN_DIR/formality"
-set PRE_LAYOUT_DIR "$RUN_DIR/pre_layout"
+set NETLIST "$OUTPUTS_DIR/netlist"
+set SVF "$OUTPUTS_DIR/svf"
+set CURRENT_RUN "$DC_DIR/current_run"
 
-foreach dir [list $RUN_DIR $REPORTS_DIR $OUTPUTS_DIR $SNAPSHOT_DIR $FORMALITY_DIR $PRE_LAYOUT_DIR] {
+if {[file exists $RUN_DIR]} {
+    error "RUN directory already exists: $RUN_DIR"
+}
+
+foreach dir [list $RUN_DIR $REPORTS_DIR $OUTPUTS_DIR $SNAPSHOT_DIR $NETLIST $SVF] {
     file mkdir $dir
     puts "Criado: $dir"
 }
+
+# remove previous symbolic link
+if {[file exists $CURRENT_RUN] || ![catch {file type $CURRENT_RUN}]} {
+    file delete $CURRENT_RUN
+}
+
+# create new symbolic link
+file link -symbolic $CURRENT_RUN $RUN_DIR
 
 set work_path "$WORK_DIR"
 

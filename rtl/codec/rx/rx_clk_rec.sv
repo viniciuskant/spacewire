@@ -14,5 +14,5 @@ module rx_clk_rec (
     .B (i_S),
     .Q (o_rx_clk)
 );
-assign o_rx_clk_n = ~o_rx_clk;
+assign o_rx_clk = i_D ^ i_S;
 endmodule

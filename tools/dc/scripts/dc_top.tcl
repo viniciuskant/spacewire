@@ -13,13 +13,18 @@ set FM_DIR $::env(FM_DIR)
 set VCS_DIR $::env(VCS_DIR)
 
 set PDK_MACRO $::env(PDK_MACRO)
-set TOP_MODULE_NAME $::env(TOP_MODULE_NAME)
+set DESIGN $::env(DESIGN)
 
 source "${DC_DIR}/scripts/dc_setup.tcl"
 
 # Executa os scripts
+set_svf "${OUTPUTS_DIR}/svf/${DESIGN}_netlist.svf"
 source "${DC_DIR}/scripts/read.tcl"
+
 source "${CONSTRAINTS_DIR}/codec.tcl"
+
 source "${DC_DIR}/scripts/compile.tcl"
+
+set_svf -off
 
 # exit
