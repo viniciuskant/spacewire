@@ -137,8 +137,8 @@ set_output_delay 1.0 -clock clk_tx [get_ports {o_D o_S}]
 
 # Data-Strobe input
 set RX_CAP_FLOPS [get_cells -hier -filter "full_name =~ u_rx/u_cap/d_*_reg*"]
-set_max_delay 1.0 -from [get_ports i_D] -to $RX_CAP_FLOPS
-set_min_delay 0.0 -from [get_ports i_D] -to $RX_CAP_FLOPS
+set_max_delay -datapath_only 1.0 -from [get_ports i_D] -to $RX_CAP_FLOPS
+set_min_delay -datapath_only 0.0 -from [get_ports i_D] -to $RX_CAP_FLOPS
 
 # Recovered clock uncertainty
 # TODO: verificar valores de acordo com o cabo e especificação dos outros

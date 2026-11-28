@@ -6,13 +6,12 @@ module rx_clk_rec (
     output o_rx_clk,
     output o_rx_clk_n
 );
-// TODO: change this to a PDK cell
-// (* dont_touch *) xor xor0 (o_rx_clk, i_D, i_S);
 
-(* dont_touch = "true" *) EO2JIX0 xor0 (
+// cells from IHP130
+EO2JIX1 u_xor (
     .A (i_D),
     .B (i_S),
     .Q (o_rx_clk)
 );
-assign o_rx_clk = i_D ^ i_S;
+INVJIX1 u_inv (.A(o_rx_clk), .Q(o_rx_clk_n));
 endmodule
