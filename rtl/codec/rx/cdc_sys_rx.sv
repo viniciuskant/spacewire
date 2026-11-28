@@ -70,7 +70,7 @@ sync_gray_counter #(.WIDTH(4)) activity_pos_counter (
     .i_r_rstn(i_sys_rstn),
     .o_delta(o_sys_activity_pos_count)
 );
-sync_gray_counter #(.WIDTH(4)) activity_neg_counter (
+sync_gray_counter #(.W_NEGEDGE(1), .WIDTH(4)) activity_neg_counter (
     .i_w_clk(i_rx_clk_n),
     .i_w_rstn(i_rx_hard_rstn),
     .i_inc(1'b1),

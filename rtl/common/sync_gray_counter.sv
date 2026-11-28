@@ -4,7 +4,7 @@
 // two samples of the read clock. The parameter WIDTH must
 // be wide enough to accommodate the maximum number of events
 // that can happen between two read cycles.
-module sync_gray_counter #(parameter WIDTH=2)
+module sync_gray_counter #(parameter WIDTH=2, W_NEGEDGE=0)
 (
     // write clock, reset and inputs
     input i_w_clk,
@@ -27,15 +27,29 @@ module sync_gray_counter #(parameter WIDTH=2)
 
     wire [WIDTH-1:0] nextbin = bin + i_inc;
     wire [WIDTH-1:0] nextgray = nextbin ^ (nextbin >> 1);
-    always_ff @(posedge i_w_clk or negedge i_w_rstn) begin
-        if (!i_w_rstn) begin 
-            bin <= 0;
-            gray <= 0;
-        end else begin
-            bin <= nextbin;
-            gray <= nextgray;
+    generate
+        if (W_NEGEDGE) begin : g_neg
+            always_ff @(negedge i_w_clk or negedge i_w_rstn) begin
+                if (!i_w_rstn) begin 
+                    bin <= 0;
+                    gray <= 0;
+                end else begin
+                    bin <= nextbin;
+                    gray <= nextgray;
+                end
+            end
+        end else begin : g_pos
+            always_ff @(posedge i_w_clk or negedge i_w_rstn) begin
+                if (!i_w_rstn) begin 
+                    bin <= 0;
+                    gray <= 0;
+                end else begin
+                    bin <= nextbin;
+                    gray <= nextgray;
+                end
+            end
         end
-    end
+    endgenerate
 
     always_ff @(posedge i_r_clk or negedge i_r_rstn) begin
         if (!i_r_rstn) begin 

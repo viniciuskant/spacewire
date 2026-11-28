@@ -18,8 +18,7 @@ codec/tx/tx.sv
 
 codec/rx/cdc_sys_rx.sv
 codec/rx/rx_decoder.sv
-codec/rx/rx_clk_rec.sv
-codec/rx/rx_ds_capture.sv
+codec/rx/rx_ds_fe.sv
 codec/rx/rx_link_mon.sv
 codec/rx/rx_buffer_wr.sv
 codec/rx/rx.sv

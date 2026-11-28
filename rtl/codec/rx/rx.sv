@@ -44,22 +44,16 @@ always_ff @(posedge i_sys_clk or negedge i_sys_rstn) begin
 end
 
 // ---- clock recovery and data capture ----
-wire rx_clk, rx_clk_n;
-rx_clk_rec u_clk_rec (
+
+rx_ds_fe u_fe (
     .i_D(i_D),
     .i_S(i_S),
-    .o_rx_clk(rx_clk),
-    .o_rx_clk_n(rx_clk_n)
-);
-wire [1:0] dpair;
-wire dpair_valid;
-rx_ds_capture u_cap (
-    .i_rx_clk(rx_clk),
     .i_rx_rstn(rx_rstn),
-    .i_D(i_D),
+    .o_rx_clk(rx_clk),
     .o_pair(dpair),
     .o_pair_valid(dpair_valid)
 );
+
 
 // ---- RX decoder ----
 wire cdc_rx_got_null, cdc_rx_got_nchar, cdc_rx_got_timecode;
@@ -111,10 +105,9 @@ wire [8:0] cdc_sys_nchar_data;
 wire cdc_sys_timecode_read;
 wire cdc_sys_timecode_valid;
 wire [7:0] cdc_sys_timecode_data;
-cdc_sys_rx cdc0 (
+cdc_sys_rx u_cdc (
     // ----- RX domain ----- 
     .i_rx_clk(rx_clk), // recovered rising edge
-    .i_rx_clk_n(rx_clk_n), // recovered falling edge
     // RX hard reset (global reset). Used to reset
     // CDC primitives.
     .i_rx_hard_rstn(i_sys_rstn), 
