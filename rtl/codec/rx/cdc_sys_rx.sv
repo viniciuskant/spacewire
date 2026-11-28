@@ -1,7 +1,6 @@
 module cdc_sys_rx (
     // ----- RX domain ----- 
-    input i_rx_clk, // recovered rising edge
-    input i_rx_clk_n, // recovered falling edge
+    input i_rx_clk, // recovered clock
     // RX hard reset (global reset). Used to reset
     // CDC primitives.
     input i_rx_hard_rstn, 
@@ -71,7 +70,7 @@ sync_gray #(.WIDTH(4)) u_gray_act_pos (
     .o_delta(o_sys_activity_pos_count)
 );
 sync_gray #(.W_NEGEDGE(1), .WIDTH(4)) u_gray_act_neg (
-    .i_w_clk(i_rx_clk_n),
+    .i_w_clk(i_rx_clk),
     .i_w_rstn(i_rx_hard_rstn),
     .i_inc(1'b1),
     .i_r_clk(i_sys_clk),

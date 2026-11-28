@@ -4,7 +4,6 @@ namespace eval ds_rx_fe {
     variable XOR_OUT Q
     variable D_POS d_pos_reg
     variable D_NEG d_neg_reg
-    variable PAIR o_pair_reg
 
     # build normalized module paths
     proc paths {fe} {
@@ -13,6 +12,8 @@ namespace eval ds_rx_fe {
         return [list $fe $pfx]
     }
     proc constraints {fe dport sport} {
+        global T_RX_CLK
+
         variable XOR_INST; variable XOR_OUT
         variable BUF_INST
         variable D_POS; variable D_NEG
@@ -21,9 +22,6 @@ namespace eval ds_rx_fe {
         lassign [paths $fe] fe pfx
 
 
-        # 200Mbit/s
-        set tbit 5.0
-        set p [expr 2*$tbit]
         # clock-path jitter in ns
         set jitter 0.10
 
@@ -31,7 +29,7 @@ namespace eval ds_rx_fe {
         set partner_tx_skew 1.234 ;# link partner output D/S skew
         set cable_skew 0.5 ;# 5m cable at 0.1ns/m
         set cable_jitter 0.5 ;# 5m cable at 0.1ns/m
-        set SKEW [expr $partner_tx_skew + $cable_skew + $cable_jitter]
+        set skew [expr $partner_tx_skew + $cable_skew + $cable_jitter]
         set clk [expr {$fe eq "" ? "rx_clk" : "rx_clk_[string map {/ _} $fe]"}]
 
         # Five conditions need to be met in the clock recovery.
@@ -57,7 +55,7 @@ namespace eval ds_rx_fe {
         # "" means the FE module is the top level in this synthesis.
         # Set FE = "u_codec/u_rx/u_ds_fe" at top.
 
-        create_clock -name $clk -period $p [get_pins ${pfx}${XOR_INST}/${XOR_OUT}]
+        create_clock -name $clk -period $T_RX_CLK [get_pins ${pfx}${XOR_INST}/${XOR_OUT}]
 
         # pad -> XOR input, per corner (measure: report_timing -from {d s} -to ${FE}u_xor/*)
         set_clock_latency -source -early 0.30 [get_clocks $clk]
@@ -89,7 +87,7 @@ namespace eval ds_rx_fe {
         # ---------- condition 6 + environment: standalone only ----------
         if {$fe eq ""} {
             set_driving_cell -lib_cell BUFJIX1 [get_ports [list $dport $sport]]
-            set_output_delay -clock $clk [expr 0.5*$p] [get_ports ${PAIR}*]
+            set_output_delay -clock $clk [expr 0.5*$T_RX_CLK] [get_ports o_pair*]
             set_load 0.01 [all_outputs]
         }
 
@@ -102,7 +100,7 @@ namespace eval ds_rx_fe {
         variable BUF_INST;
         variable D_POS; variable D_NEG;
         variable PAIR;
-        lassign [dx_rx_fe_paths $fe] fe pfx
+        lassign [paths $fe] fe pfx
 
         # Don't touch the XOR and BUF cells
         set_dont_touch [get_cells [list ${pfx}${XOR_INST} ${pfx}${BUF_INST}]]

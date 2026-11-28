@@ -19,7 +19,10 @@ source "${DC_DIR}/scripts/dc_setup.tcl"
 
 # Executa os scripts
 source "${DC_DIR}/scripts/read.tcl"
+source "${CONSTRAINTS_DIR}/clocks.tcl"
 source "${CONSTRAINTS_DIR}/codec.tcl"
+spw_codec::constraints "" clk_sys clk_tx i_D i_S o_D o_S
+spw_codec::impl ""
 source "${DC_DIR}/scripts/compile.tcl"
 
 # exit

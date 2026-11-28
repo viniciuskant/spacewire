@@ -37,7 +37,7 @@ module rx(
 // functional RX reset. Driven straight from a flop so it can't
 // glitch: it feeds async resets in the recovered clock domain.
 // Asserts with `i_sys_rstn`, releases one cycle after `i_rx_enable`.
-(* dont_touch *) logic rx_rstn;
+logic rx_rstn;
 always_ff @(posedge i_sys_clk or negedge i_sys_rstn) begin
     if (!i_sys_rstn) rx_rstn <= 0;
     else rx_rstn <= i_rx_enable;
@@ -45,6 +45,9 @@ end
 
 // ---- clock recovery and data capture ----
 
+wire rx_clk;
+wire [1:0] dpair;
+wire dpair_valid;
 rx_ds_fe u_fe (
     .i_D(i_D),
     .i_S(i_S),
