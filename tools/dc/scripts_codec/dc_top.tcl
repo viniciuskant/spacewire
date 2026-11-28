@@ -13,7 +13,7 @@ set FM_DIR $::env(FM_DIR)
 set VCS_DIR $::env(VCS_DIR)
 
 set PDK_MACRO $::env(PDK_MACRO)
-set DESIGN $::env(DESIGN)
+set DESIGN codec
 set SCRIPTS_DIR "${DC_DIR}/scripts_codec"
 
 source "${SCRIPTS_DIR}/dc_setup.tcl"

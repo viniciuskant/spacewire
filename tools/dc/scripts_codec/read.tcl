@@ -26,8 +26,6 @@ set v_files [concat $v_files [split [exec find "$RTL_DIR/common" -name "*.sv"] "
 set v_files [concat $v_files [split [exec find "$RTL_DIR/codec" -name "*.sv"] "\n"]]
 set v_files [lsearch -all -inline -not -exact $v_files ""]
 
-echo "++++++++++++++++++++++++"
-echo $v_files
 
 if {[llength $v_files] > 0} {
     analyze -format sverilog -define $PDK_MACRO $v_files

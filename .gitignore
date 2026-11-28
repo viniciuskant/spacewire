@@ -39,5 +39,5 @@ out_data/
 alib-52/ 
 runs/
 run/
-current_run
+current_run*
 *.old

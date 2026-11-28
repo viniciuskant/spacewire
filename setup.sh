@@ -15,7 +15,6 @@ export VCS_DIR="${TOOLS_DIR}/vcs"
 
 
 export PDK_MACRO=IHP130   # or SAED32, or SAED90, or IHP130, or NULL
-export DESIGN="codec"
 
 ### MODULES
 MODULES=(

@@ -27,7 +27,7 @@ read_db $GTECH_LIBRARY
 read_db $SYNTHETIC_LIBRARY
 
 set synopsys_auto_setup true
-set_svf "${DC_DIR}/current_run/outputs/svf/${DESIGN}_netlist.svf"
+set_svf "${DC_DIR}/current_run_codec/outputs/svf/${DESIGN}_netlist.svf"
 
 set v_files {}
 lappend v_files "$RTL_DIR/spw_pkg.sv"
@@ -42,7 +42,7 @@ get_designs -quiet r:/*
 
 set_top r:/WORK/$DESIGN
 
-read_verilog -container i -lib WORK "$DC_DIR/current_run/outputs/netlist/${DESIGN}_netlist.v"
+read_verilog -container i -lib WORK "$DC_DIR/current_run_codec/outputs/netlist/${DESIGN}_netlist.v"
 
 set_top i:/WORK/$DESIGN
 
