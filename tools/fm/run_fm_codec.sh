@@ -12,7 +12,7 @@ if [ ! -d "${DC_DIR}/current_run" ]; then
 fi
 
 TMP_DIR="${FM_DIR}/.tmp"
-SCRIPTS_DIR="${FM_DIR}/scripts"
+SCRIPTS_DIR="${FM_DIR}/scripts_codec"
 
 rm -rf "$TMP_DIR"
 mkdir -p "$TMP_DIR"

@@ -15,8 +15,9 @@ set VCS_DIR $::env(VCS_DIR)
 set PDK_MACRO $::env(PDK_MACRO)
 set DESIGN $::env(DESIGN)
 
+set SCRIPTS_DIR "${FM_DIR}/scripts_codec"
 
-source "${FM_DIR}/scripts/fm_setup.tcl"
+source "${SCRIPTS_DIR}/fm_setup.tcl"
 
 set mv_use_fm_gui false
 set sh_new_variables true
@@ -28,9 +29,15 @@ read_db $SYNTHETIC_LIBRARY
 set synopsys_auto_setup true
 set_svf "${DC_DIR}/current_run/outputs/svf/${DESIGN}_netlist.svf"
 
-read_sverilog -container r -lib WORK -vcs [list \
-    -f "${RTL_DIR}/filelist.f" \
-]
+set v_files {}
+lappend v_files "$RTL_DIR/spw_pkg.sv"
+set common_files [split [exec find "$RTL_DIR/common" -name "*.sv"] "\n"]
+set v_files [concat $v_files [lsort $common_files]]
+set codec_files [split [exec find "$RTL_DIR/codec" -name "*.sv"] "\n"]
+set v_files [concat $v_files [lsort $codec_files]]
+set v_files [lsearch -all -inline -not -exact $v_files ""]
+read_sverilog -container r -lib WORK -vcs $v_files
+
 get_designs -quiet r:/*
 
 set_top r:/WORK/$DESIGN

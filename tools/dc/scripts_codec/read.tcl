@@ -21,24 +21,18 @@ set verilogout_show_unconnected_pins true
 # Verilog
 
 set v_files {}
+lappend v_files "$RTL_DIR/spw_pkg.sv"
+set v_files [concat $v_files [split [exec find "$RTL_DIR/common" -name "*.sv"] "\n"]]
+set v_files [concat $v_files [split [exec find "$RTL_DIR/codec" -name "*.sv"] "\n"]]
+set v_files [lsearch -all -inline -not -exact $v_files ""]
 
-set fp [open "${RTL_DIR}/filelist.f" r]
+echo "++++++++++++++++++++++++"
+echo $v_files
 
-while {[gets $fp line] >= 0} {
-    set line [string trim $line]
-
-    if {$line eq "" || [string match "#*" $line]} {
-        continue
-    }
-
-    lappend v_files [file normalize "${RTL_DIR}/${line}"]
-}
-
-close $fp
-
-# Analyze RTL
-foreach file $v_files {
-    analyze -format sverilog $file
+if {[llength $v_files] > 0} {
+    analyze -format sverilog -define $PDK_MACRO $v_files
+} else {
+    puts "ERROR: No .sv files found in $RTL_DIR"
 }
 
 # Elaborate top module

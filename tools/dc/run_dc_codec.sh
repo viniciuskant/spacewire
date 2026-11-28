@@ -6,7 +6,7 @@ if [ -z "${PROJECT_ROOT:-}" ]; then
 fi
 
 TMP_DIR="${DC_DIR}/.tmp"
-SCRIPTS_DIR="${DC_DIR}/scripts"
+SCRIPTS_DIR="${DC_DIR}/scripts_codec"
 
 rm -rf "$TMP_DIR"
 mkdir -p "$TMP_DIR"

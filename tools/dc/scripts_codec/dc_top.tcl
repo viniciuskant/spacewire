@@ -14,16 +14,17 @@ set VCS_DIR $::env(VCS_DIR)
 
 set PDK_MACRO $::env(PDK_MACRO)
 set DESIGN $::env(DESIGN)
+set SCRIPTS_DIR "${DC_DIR}/scripts_codec"
 
-source "${DC_DIR}/scripts/dc_setup.tcl"
+source "${SCRIPTS_DIR}/dc_setup.tcl"
 
 # Executa os scripts
 set_svf "${OUTPUTS_DIR}/svf/${DESIGN}_netlist.svf"
-source "${DC_DIR}/scripts/read.tcl"
+source "${SCRIPTS_DIR}/read.tcl"
 
 source "${CONSTRAINTS_DIR}/codec.tcl"
 
-source "${DC_DIR}/scripts/compile.tcl"
+source "${SCRIPTS_DIR}/compile.tcl"
 
 set_svf -off
 
