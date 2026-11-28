@@ -4,7 +4,7 @@
 // two samples of the read clock. The parameter WIDTH must
 // be wide enough to accommodate the maximum number of events
 // that can happen between two read cycles.
-module sync_gray_counter #(parameter WIDTH=2, W_NEGEDGE=0)
+module sync_gray #(parameter WIDTH=2, W_NEGEDGE=0)
 (
     // write clock, reset and inputs
     input i_w_clk,
@@ -22,8 +22,8 @@ module sync_gray_counter #(parameter WIDTH=2, W_NEGEDGE=0)
     logic [WIDTH-1:0] read_bin_prev;
     logic [WIDTH-1:0] read_bin_curr;
 
-    (* async_reg = "true" *) logic [WIDTH-1:0] gray_ff1;
-    (* async_reg = "true" *) logic [WIDTH-1:0] gray_ff2;
+    logic [WIDTH-1:0] gray_ff1;
+    logic [WIDTH-1:0] gray_ff2;
 
     wire [WIDTH-1:0] nextbin = bin + i_inc;
     wire [WIDTH-1:0] nextgray = nextbin ^ (nextbin >> 1);

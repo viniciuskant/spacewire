@@ -26,6 +26,7 @@ wire [ASIZE:0] rgraynext, rbinnext;
 
 reg [DSIZE-1:0] mem [0:MEMSIZE-1];
 
+// CDC
 // cross the read gray pointer into the write clock domain
 always @(posedge i_wclk or negedge i_wrst_n) begin
     if (!i_wrst_n) begin

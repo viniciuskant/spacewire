@@ -3,7 +3,7 @@ spw_pkg.sv
 
 common/async_fifo.sv
 common/sync_2ff.sv
-common/sync_gray_counter.sv
+common/sync_gray.sv
 common/fifo.sv
 common/reset_sync.sv
 

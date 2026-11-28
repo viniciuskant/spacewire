@@ -63,7 +63,7 @@ wire cdc_rx_nchar_full, cdc_rx_nchar_wr;
 wire [8:0] cdc_rx_nchar_data;
 wire cdc_rx_timecode_full, cdc_rx_timecode_wr;
 wire [7:0] cdc_rx_timecode_data;
-rx_decoder dec (
+rx_decoder u_dec (
     .i_rx_clk(rx_clk), // recovered clock
     .i_rx_rstn(rx_rstn), // functional reset
     .i_dpair(dpair), // D pair from ds_capture

@@ -52,7 +52,7 @@ module cdc_sys_rx (
     output [7:0] o_sys_timecode
 );
 
-sync_gray_counter #(.WIDTH(4)) fct_counter (
+sync_gray #(.WIDTH(4)) u_gray_fct (
     .i_w_clk(i_rx_clk),
     .i_w_rstn(i_rx_hard_rstn),
     .i_inc(i_rx_inc_fct),
@@ -62,7 +62,7 @@ sync_gray_counter #(.WIDTH(4)) fct_counter (
 );
 // if RX is clocked, we got a bit, so
 // `i_inc` can be 1
-sync_gray_counter #(.WIDTH(4)) activity_pos_counter (
+sync_gray #(.WIDTH(4)) u_gray_act_pos (
     .i_w_clk(i_rx_clk),
     .i_w_rstn(i_rx_hard_rstn),
     .i_inc(1'b1),
@@ -70,7 +70,7 @@ sync_gray_counter #(.WIDTH(4)) activity_pos_counter (
     .i_r_rstn(i_sys_rstn),
     .o_delta(o_sys_activity_pos_count)
 );
-sync_gray_counter #(.W_NEGEDGE(1), .WIDTH(4)) activity_neg_counter (
+sync_gray #(.W_NEGEDGE(1), .WIDTH(4)) u_gray_act_neg (
     .i_w_clk(i_rx_clk_n),
     .i_w_rstn(i_rx_hard_rstn),
     .i_inc(1'b1),
@@ -79,37 +79,37 @@ sync_gray_counter #(.W_NEGEDGE(1), .WIDTH(4)) activity_neg_counter (
     .o_delta(o_sys_activity_neg_count)
 );
 
-sync_2ff got_null_2ff (
+sync_2ff u_2ff_got_null (
     .clk_dest(i_sys_clk),
     .rst_n(i_sys_rstn),
     .async_data(i_rx_got_null),
     .sync_data(o_sys_got_null)
 );
-sync_2ff got_nchar_2ff (
+sync_2ff u_2ff_got_nchar (
     .clk_dest(i_sys_clk),
     .rst_n(i_sys_rstn),
     .async_data(i_rx_got_nchar),
     .sync_data(o_sys_got_nchar)
 );
-sync_2ff got_timecode_2ff (
+sync_2ff u_2ff_got_timecode (
     .clk_dest(i_sys_clk),
     .rst_n(i_sys_rstn),
     .async_data(i_rx_got_timecode),
     .sync_data(o_sys_got_timecode)
 );
-sync_2ff parity_error_2ff (
+sync_2ff u_2ff_parity_error (
     .clk_dest(i_sys_clk),
     .rst_n(i_sys_rstn),
     .async_data(i_rx_parity_error),
     .sync_data(o_sys_parity_error)
 );
-sync_2ff esc_error_2ff (
+sync_2ff u_2ff_esc_error (
     .clk_dest(i_sys_clk),
     .rst_n(i_sys_rstn),
     .async_data(i_rx_esc_error),
     .sync_data(o_sys_esc_error)
 );
-sync_2ff fifo_overflow_2ff (
+sync_2ff u_2ff_fifo_overflow (
     .clk_dest(i_sys_clk),
     .rst_n(i_sys_rstn),
     .async_data(i_rx_fifo_overflow),
@@ -118,7 +118,7 @@ sync_2ff fifo_overflow_2ff (
 
 wire nchar_empty;
 assign o_sys_nchar_valid = !nchar_empty;
-async_fifo #(.DSIZE(9), .ASIZE(3)) nchar_fifo (
+async_fifo #(.DSIZE(9), .ASIZE(3)) u_afifo_nchar (
     .i_wclk(i_rx_clk),
     .i_wrst_n(i_rx_hard_rstn),
     .i_wr(i_rx_nchar_wr),
@@ -133,7 +133,7 @@ async_fifo #(.DSIZE(9), .ASIZE(3)) nchar_fifo (
 
 wire tc_empty;
 assign o_sys_timecode_valid = !tc_empty;
-async_fifo #(.DSIZE(8), .ASIZE(2)) tc_fifo (
+async_fifo #(.DSIZE(8), .ASIZE(2)) u_afifo_tc (
     .i_wclk(i_rx_clk),
     .i_wrst_n(i_rx_hard_rstn),
     .i_wr(i_rx_timecode_wr),

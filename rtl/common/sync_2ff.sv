@@ -7,8 +7,8 @@ module sync_2ff (
     output sync_data      // Synchronized output
 );
 
-    (* async_reg = "true" *) logic sync_ff1;
-    (* async_reg = "true" *) logic sync_ff2;
+    logic sync_ff1;
+    logic sync_ff2;
 
     always_ff @(posedge clk_dest or negedge rst_n) begin
         if (!rst_n) begin
