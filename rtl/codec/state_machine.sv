@@ -84,8 +84,7 @@ module state_machine (
         next_state = state;
         timer_en = 1'b0;
         timer_clear = 1'b0;
-        // these outputs are set here because they are pulses
-        // on the Run -> ErrorReset edge
+        
         next_link_error = 0;
         next_left_run = 0;
 

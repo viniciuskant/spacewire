@@ -27,3 +27,17 @@ codec/rx/rx.sv
 codec/credit.sv
 codec/state_machine.sv
 codec/codec.sv
+
+rmap/rmap_crc8.sv
+rmap/rmap_reg_bank.sv
+rmap/RMAP.sv
+rmap/coded_port_zero.sv
+
+router/sw_route_table.sv
+router/sw_in_ctrl.sv
+router/sw_out_arb.sv
+router/sw_crossbar.sv
+router/sw_tc_unit.sv
+router/spw_switch.sv
+
+top/spw_router.sv

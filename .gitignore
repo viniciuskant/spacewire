@@ -40,3 +40,4 @@ alib-52/
 runs/
 run/
 current_run
+*.old
